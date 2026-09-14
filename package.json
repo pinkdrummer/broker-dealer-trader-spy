@@ -3,6 +3,8 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "main": "electron/main.mjs",
+  "productName": "Premium Alerts",
   "overrides": {
     "nf3": "0.3.17"
   },
@@ -18,7 +20,8 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/book.test.ts src/lib/backup.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "app": "electron ./electron/main.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -93,5 +96,8 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.2.0"
+  },
+  "optionalDependencies": {
+    "electron": "^37.3.1"
   }
 }

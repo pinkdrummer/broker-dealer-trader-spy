@@ -1,0 +1,16 @@
+#!/bin/bash
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$ROOT" || exit 1
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.nvm/nvm.sh"
+fi
+
+ELECTRON="$ROOT/node_modules/.bin/electron"
+if [ ! -x "$ELECTRON" ]; then
+  osascript -e 'display dialog "One extra install, then this becomes a normal Mac app.\n\n1. Open Terminal\n2. Type:  cd  (with a space)\n3. Drag the broker-dealer-trader-spy-main folder onto Terminal, press Return\n4. Type:  npm install   and press Return\n5. Double-click Premium Alerts again." with title "Premium Alerts" buttons {"OK"} default button 1' >/dev/null
+  exit 1
+fi
+
+exec "$ELECTRON" "$ROOT/electron/main.mjs"
