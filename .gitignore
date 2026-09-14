@@ -11,3 +11,10 @@ screenshots/*.json
 .grok/status
 .grok/project_memory.md
 premium-alerts.log
+dist/
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+.premium-alerts-signing/
+AuthKey_*.p8

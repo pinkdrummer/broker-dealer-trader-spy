@@ -1,0 +1,45 @@
+# Self-contained Mac build. Does not read tasty keys from disk or env.
+# Signing / notarization use APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+# and the Developer ID Application identity in the login keychain.
+# See docs/MAC_DISTRIBUTION.md.
+
+appId: com.premiumalerts.desk
+productName: Premium Alerts
+copyright: Copyright © 2026 Jonathan Hawken
+directories:
+  output: dist
+  buildResources: build
+asar: true
+files:
+  - electron/**
+  - package.json
+  - public/**
+  - src/**
+  - scripts/with-app-env.mjs
+  - scripts/app-env-plugin.mjs
+  - scripts/grok-pwa-plugin.mjs
+  - scripts/grok-pwa-shared.mjs
+  - scripts/migration-plan.mjs
+  - vite.config.ts
+  - tsconfig.json
+mac:
+  category: public.app-category.finance
+  icon: public/__grok/icon-180.png
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  notarize: true
+dmg:
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+publish:
+  provider: github
+  owner: pinkdrummer
+  repo: broker-dealer-trader-spy
+  releaseType: release

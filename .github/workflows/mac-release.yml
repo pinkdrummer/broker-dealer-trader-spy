@@ -1,0 +1,23 @@
+# Runs when you push a tag like v1.0.1.
+# Notarization stays OFF until APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD /
+# APPLE_TEAM_ID (and optional CSC_LINK) are set as repo secrets.
+# Do not put tasty keys in GitHub secrets.
+
+name: mac-release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signing is local until secrets exist
+        run: |
+          echo "Mac signing and notarization happen on Jonathan's Apple Silicon Mac."
+          echo "See docs/MAC_DISTRIBUTION.md."
+          echo "This workflow is a placeholder so the tag channel is ready."
+          echo "Do not upload a backup JSON or tasty tokens as release assets."
