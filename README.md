@@ -2,6 +2,14 @@
 
 A tape-only options desk. Each contract is its own line. Shorts are percent of credit collected; longs are percent of debit paid. Alerts fire when a rung is crossed. **It does not place orders.** Keep your Close-at-20% / 50% working orders in tastytrade.
 
+This GitHub page is the **source**. You download it, run it on your computer, and connect **your** tastytrade account. You are not using someone else’s desk.
+
+## Words
+
+- **GitHub / repo** — this website. It is just a shared folder of the app.
+- **Node** — a small program you install once, like Chrome. It is what actually runs the app on your Mac or PC. Version **22** or newer.
+- **Terminal** — the text window where you paste a few commands. On a Mac: Spotlight → type `Terminal`. On Windows: Start → `PowerShell`.
+
 ## What you get
 
 - Pull from tastytrade (read-only OAuth)
@@ -11,21 +19,48 @@ A tape-only options desk. Each contract is its own line. Shorts are percent of c
 - Watch: on-screen toast, sound, optional [ntfy](https://ntfy.sh) on your phone
 - Backup / restore in Settings so the book survives a browser reset
 
-## 1. Install Node
+## 1. Install Node (once)
 
-You need **Node 22** (LTS is fine if it is 22+).
-
-- Mac: [nodejs.org](https://nodejs.org) → LTS installer, or `brew install node`
-- Windows: [nodejs.org](https://nodejs.org) → LTS installer
-- Confirm in Terminal / PowerShell:
+1. Open [https://nodejs.org](https://nodejs.org)
+2. Download the **LTS** button (it should say 22 or higher)
+3. Run the installer. Next / Next / Finish
+4. **Quit Terminal if it was already open, then open it again**
+5. Paste this and press Return:
 
 ```bash
 node -v
 ```
 
-You want `v22` or higher.
+You want something like `v22.x.x`. If it says “command not found”, Node did not install — run the installer again and reopen Terminal.
 
-## 2. Get the code
+## 2. Download this app
+
+### Option A — easiest if you have never used git
+
+1. On this GitHub page, click the green **Code** button
+2. **Download ZIP**
+3. Unzip it. You get a folder named `broker-dealer-trader-spy-main`
+4. In Terminal:
+
+**Mac**
+
+```bash
+cd ~/Downloads/broker-dealer-trader-spy-main
+npm install
+npm run dev
+```
+
+**Windows (PowerShell)**
+
+```bash
+cd $HOME\Downloads\broker-dealer-trader-spy-main
+npm install
+npm run dev
+```
+
+If the folder is not in Downloads, drag the folder onto the Terminal window after typing `cd ` (with a space) and press Return, then run `npm install` and `npm run dev`.
+
+### Option B — if you already have git
 
 ```bash
 git clone https://github.com/pinkdrummer/broker-dealer-trader-spy.git
@@ -34,54 +69,52 @@ npm install
 npm run dev
 ```
 
-Leave that window open. In the browser go to **http://localhost:8080**.
+`npm install` takes a minute the first time. `npm run dev` starts the app. **Leave that window open.**
 
-If `git` is missing on a Mac: install [Xcode Command Line Tools](https://developer.apple.com/xcode/) (`xcode-select --install`) or [Git](https://git-scm.com).
+## 3. Open it
 
-## 3. Your own tastytrade keys (required)
+In Chrome, Safari, or Brave go to:
 
-Everyone uses **their own** OAuth app. Do not paste anyone else’s secret or refresh token. Do not drop keys in Slack.
+**http://localhost:8080**
 
-1. Log into tastytrade on the web.
-2. **Manage → API**.
-3. Create a **personal OAuth2 app**, read-only.
-4. Copy the **client secret**.
-5. Complete the grant so you get a **refresh token**.
-6. In Premium Alerts, click **Settings**.
-7. Paste:
-   - **Client secret**
-   - **Refresh token**
-   - **Account number** (optional — leave blank if you only have one)
-8. Save / pull. You should see your option lines, one row per contract.
+That is your copy, on your machine. Nobody else can see it.
 
-Keys stay in **this browser only**. They are not in GitHub.
+## 4. Your own tastytrade keys
 
-If the pull fails, the token is usually expired or the app is not read-only. Make a new grant; do not debug by posting the secret.
+Everyone makes **their own** OAuth app. Do not paste anyone else’s secret.
 
-## 4. Turn on Watch
+1. Log into tastytrade in a browser
+2. **Manage → API**
+3. Create a personal **OAuth2** app, **read-only**
+4. Copy the **client secret**
+5. Finish the grant so you get a **refresh token**
+6. In Premium Alerts click **Settings**
+7. Paste client secret + refresh token (account number optional)
+8. Pull. You should see one row per option contract
 
-Click **Watch**. Allow notifications if the browser asks. Click once so sound can play (Safari and Chrome both block audio until you click).
+Keys stay in **this browser**. They are not on GitHub.
 
-Alerts are on by default at 20 / 30 / 40 / … / 100% profit and 50 / 100 / … / 600% loss. Change rungs in Settings or on a single row. The **alert buffer** (default 15 minutes) means a given rung on a given contract can only fire once in that window.
+If the pull fails, make a new grant. Do not debug by posting the secret.
 
-## 5. Phone alerts (optional)
+## 5. Watch
 
-1. Install [ntfy](https://ntfy.sh) on your phone.
-2. Create a **private** topic name only you know.
-3. Paste that topic in Settings.
-4. Leave Watch on.
+Click **Watch**. Allow notifications. Click once so sound can play.
 
-This is not SMS. Anyone who knows the topic name can see the pushes, so do not use `alerts` or your name.
+Alerts default on: 20–100% profit, 50–600% loss. Settings has a buffer (15 min default) so a name chopping around −50% does not spam.
 
-## 6. Backup
+## 6. Phone (optional)
 
-Settings → **Download backup**. Keep that file on your machine. If the browser ever clears site data, restore it. The backup includes keys and the book — treat it like a password.
+Install [ntfy](https://ntfy.sh), make a private topic only you know, paste it in Settings, leave Watch on.
+
+## 7. Backup
+
+Settings → **Download backup**. Keep that file on your computer. If the browser clears data, restore it. Treat it like a password.
 
 ## What it will not do
 
 - Place, cancel, or replace orders
 - Flatten a trade
-- Share your positions with GitHub or Slack
+- Put your positions on GitHub
 
 ## License
 
