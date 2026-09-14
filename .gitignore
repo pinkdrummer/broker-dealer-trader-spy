@@ -10,3 +10,4 @@ screenshots/*.json
 .grok/preview.log
 .grok/status
 .grok/project_memory.md
+premium-alerts.log

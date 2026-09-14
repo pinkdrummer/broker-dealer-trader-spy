@@ -9,6 +9,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
 const PORT = 8080;
 const URL = `http://${HOST}:${PORT}`;
+const logPath = path.join(root, "premium-alerts.log");
 
 app.setName("Premium Alerts");
 
@@ -22,6 +23,20 @@ function findNode() {
   return "node";
 }
 
+function childEnv() {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key === "ELECTRON_RUN_AS_NODE" || key.startsWith("ELECTRON_")) delete env[key];
+  }
+  env.PATH = [
+    path.join(root, "node_modules/.bin"),
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+    process.env.PATH ?? "",
+  ].join(":");
+  return env;
+}
+
 function ping() {
   return new Promise((resolve) => {
     const req = http.get(URL, (res) => {
@@ -29,48 +44,62 @@ function ping() {
       resolve(true);
     });
     req.on("error", () => resolve(false));
-    req.setTimeout(600, () => {
+    req.setTimeout(800, () => {
       req.destroy();
       resolve(false);
     });
   });
 }
 
+function logTail() {
+  try {
+    const text = fs.readFileSync(logPath, "utf8").trim();
+    return text.slice(-1200) || "(empty log)";
+  } catch {
+    return "(no log yet)";
+  }
+}
+
 async function ensureServer() {
   if (await ping()) return false;
-  const env = {
-    ...process.env,
-    PATH: [
-      path.join(root, "node_modules/.bin"),
-      "/usr/local/bin",
-      "/opt/homebrew/bin",
-      process.env.PATH ?? "",
-    ].join(":"),
-  };
-  server = spawn(
-    findNode(),
-    [
-      path.join(root, "scripts/with-app-env.mjs"),
-      "vite",
-      "dev",
-      "--host",
-      HOST,
-      "--port",
-      String(PORT),
-    ],
-    { cwd: root, env, stdio: "ignore" },
+
+  const node = findNode();
+  const viteJs = path.join(root, "node_modules/vite/bin/vite.js");
+  const wrapper = path.join(root, "scripts/with-app-env.mjs");
+  if (!fs.existsSync(viteJs)) {
+    throw new Error(
+      "Vite is missing. In Terminal:\n\ncd " +
+        root +
+        "\nnpm install\n\nThen open Premium Alerts again.",
+    );
+  }
+
+  fs.writeFileSync(
+    logPath,
+    `\n--- ${new Date().toISOString()} node=${node} ---\n`,
+    { flag: "a" },
   );
-  server.on("error", () => {
-    /* ensureServer timeout reports this */
+  const logFd = fs.openSync(logPath, "a");
+
+  server = spawn(node, [wrapper, node, viteJs, "dev", "--host", HOST, "--port", String(PORT)], {
+    cwd: root,
+    env: childEnv(),
+    stdio: ["ignore", logFd, logFd],
   });
-  for (let i = 0; i < 90; i++) {
+  server.on("error", (err) => {
+    fs.appendFileSync(logPath, `spawn error: ${err}\n`);
+  });
+  server.on("exit", (code, signal) => {
+    fs.appendFileSync(logPath, `server exit code=${code} signal=${signal}\n`);
+  });
+
+  for (let i = 0; i < 120; i++) {
     if (await ping()) return true;
     if (server.exitCode != null) break;
     await new Promise((r) => setTimeout(r, 250));
   }
-  throw new Error(
-    "Premium Alerts could not start. Install Node from nodejs.org, then open Terminal, drag this folder, and run:\n\nnpm install",
-  );
+
+  throw new Error("Premium Alerts could not start the desk.\n\n" + logTail());
 }
 
 function createWindow() {
