@@ -37,6 +37,14 @@ find_root() {
   return 1
 }
 
+electron_ready() {
+  local root="$1"
+  [ -x "$root/node_modules/.bin/electron" ] || return 1
+  [ -d "$root/node_modules/electron/dist/Electron.app" ] && return 0
+  [ -f "$root/node_modules/electron/path.txt" ] && return 0
+  return 1
+}
+
 ROOT="$(find_root)" || {
   alert "Could not find the Premium Alerts folder. Put it in Downloads (the unzipped GitHub folder) and try again."
   exit 1
@@ -44,24 +52,26 @@ ROOT="$(find_root)" || {
 
 cd "$ROOT" || exit 1
 
-ELECTRON="$ROOT/node_modules/.bin/electron"
-if [ ! -x "$ELECTRON" ]; then
-  osascript -e 'display notification "Installing the Mac engine. This is once — about a minute." with title "Premium Alerts"'
-  if ! npm install electron@37.3.1 --no-fund --no-audit; then
-    alert "Install failed. Check that Node works (in Terminal: node -v) and that you are online, then double-click Premium Alerts again."
-    exit 1
+if ! electron_ready "$ROOT"; then
+  osascript -e 'display notification "Downloading the Mac engine. Once — about a minute." with title "Premium Alerts"'
+  npm install-scripts approve electron fsevents >/dev/null 2>&1 || true
+  npm install --no-fund --no-audit
+  if [ -f "$ROOT/node_modules/electron/install.js" ]; then
+    node "$ROOT/node_modules/electron/install.js" || true
   fi
 fi
 
-if [ ! -x "$ELECTRON" ]; then
-  alert "Electron still is not in:
-$ROOT
+if ! electron_ready "$ROOT"; then
+  alert "The Mac engine did not finish downloading.
 
-In Terminal run:
+In Terminal paste these two lines:
+
 cd $ROOT
+npm install-scripts approve electron
 npm install
-then double-click Premium Alerts."
+
+Then right-click Premium Alerts → Open."
   exit 1
 fi
 
-exec "$ELECTRON" "$ROOT/electron/main.mjs"
+exec "$ROOT/node_modules/.bin/electron" "$ROOT/electron/main.mjs"
