@@ -1,0 +1,12 @@
+node_modules/
+.project_id
+.github_repo
+.env
+.env.*
+attachments/
+screenshots/*.png
+screenshots/*.json
+.vercel/
+.grok/preview.log
+.grok/status
+.grok/project_memory.md
