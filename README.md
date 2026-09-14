@@ -116,6 +116,14 @@ Settings → **Download backup**. Keep that file on your computer. If the browse
 - Flatten a trade
 - Put your positions on GitHub
 
+## Signed Mac app
+
+The `Premium Alerts.app` next to this README is a **launcher for this folder**. It is not a notarized product.
+
+A drag-to-Applications `.dmg` needs an Apple Developer Program membership (Individual, $99/year), a **Developer ID Application** certificate, and notarization. Walkthrough: [docs/MAC_DISTRIBUTION.md](docs/MAC_DISTRIBUTION.md).
+
+Until that build exists, share the repo or the published web app — not a zip of Downloads.
+
 ## License
 
 Use it, fork it, make it yours. No warranty — it is a watch, not a broker.

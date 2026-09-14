@@ -1,5 +1,8 @@
 {
-  "name": "app-builder-workspace",
+  "name": "premium-alerts",
+  "version": "1.0.0",
+  "description": "Tape-only options desk for tastytrade. Read-only. Does not place orders.",
+  "author": "Jonathan Hawken",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -25,7 +28,8 @@
     "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/book.test.ts src/lib/backup.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "app": "electron ./electron/main.mjs"
+    "app": "electron ./electron/main.mjs",
+    "dist:mac": "electron-builder --mac --config electron-builder.yml"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -88,6 +92,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "electron-builder": "^26.16.1",
     "eslint": "^9.20.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
