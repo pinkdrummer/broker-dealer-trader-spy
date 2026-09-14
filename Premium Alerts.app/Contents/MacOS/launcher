@@ -1,15 +1,66 @@
 #!/bin/bash
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-cd "$ROOT" || exit 1
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 if [ -s "$HOME/.nvm/nvm.sh" ]; then
   # shellcheck disable=SC1091
   . "$HOME/.nvm/nvm.sh"
 fi
 
+alert() {
+  osascript -e "display dialog $(printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))') with title \"Premium Alerts\" buttons {\"OK\"} default button 1" >/dev/null
+}
+
+find_root() {
+  local guessed
+  guessed="$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)"
+  if [ -f "$guessed/electron/main.mjs" ] && [ -f "$guessed/package.json" ]; then
+    printf '%s\n' "$guessed"
+    return 0
+  fi
+  local d
+  for d in \
+    "$HOME/Downloads/broker-dealer-trader-spy-main" \
+    "$HOME/Downloads/broker-dealer-trader-spy" \
+    "$HOME/Documents/broker-dealer-trader-spy-main" \
+    "$HOME/Desktop/broker-dealer-trader-spy-main"
+  do
+    if [ -f "$d/electron/main.mjs" ]; then
+      printf '%s\n' "$d"
+      return 0
+    fi
+  done
+  local hit
+  hit="$(find "$HOME/Downloads" "$HOME/Documents" "$HOME/Desktop" -maxdepth 4 -type f -path '*/electron/main.mjs' 2>/dev/null | head -n 1)"
+  if [ -n "$hit" ]; then
+    dirname "$(dirname "$hit")"
+    return 0
+  fi
+  return 1
+}
+
+ROOT="$(find_root)" || {
+  alert "Could not find the Premium Alerts folder. Put it in Downloads (the unzipped GitHub folder) and try again."
+  exit 1
+}
+
+cd "$ROOT" || exit 1
+
 ELECTRON="$ROOT/node_modules/.bin/electron"
 if [ ! -x "$ELECTRON" ]; then
-  osascript -e 'display dialog "One extra install, then this becomes a normal Mac app.\n\n1. Open Terminal\n2. Type:  cd  (with a space)\n3. Drag the broker-dealer-trader-spy-main folder onto Terminal, press Return\n4. Type:  npm install   and press Return\n5. Double-click Premium Alerts again." with title "Premium Alerts" buttons {"OK"} default button 1' >/dev/null
+  osascript -e 'display notification "Installing the Mac engine. This is once — about a minute." with title "Premium Alerts"'
+  if ! npm install electron@37.3.1 --no-fund --no-audit; then
+    alert "Install failed. Check that Node works (in Terminal: node -v) and that you are online, then double-click Premium Alerts again."
+    exit 1
+  fi
+fi
+
+if [ ! -x "$ELECTRON" ]; then
+  alert "Electron still is not in:
+$ROOT
+
+In Terminal run:
+cd $ROOT
+npm install
+then double-click Premium Alerts."
   exit 1
 fi
 
