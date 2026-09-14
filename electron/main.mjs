@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog } from "electron";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,11 +17,35 @@ app.setName("Premium Alerts");
 let server = null;
 let startedByUs = false;
 
-function findNode() {
-  for (const p of ["/usr/local/bin/node", "/opt/homebrew/bin/node"]) {
-    if (fs.existsSync(p)) return p;
+function nodeArch(bin) {
+  try {
+    return execFileSync(bin, ["-p", "process.arch"], { encoding: "utf8" }).trim();
+  } catch {
+    return "";
   }
-  return "node";
+}
+
+function findNode() {
+  const nvmDir = path.join(os.homedir(), ".nvm", "versions", "node");
+  const nvmNodes = [];
+  try {
+    for (const ver of fs.readdirSync(nvmDir)) {
+      const p = path.join(nvmDir, ver, "bin", "node");
+      if (fs.existsSync(p)) nvmNodes.push(p);
+    }
+  } catch {
+    /* no nvm */
+  }
+  const candidates = [
+    "/opt/homebrew/bin/node",
+    ...nvmNodes,
+    "/usr/local/bin/node",
+    "node",
+  ];
+  const existing = candidates.filter((p) => p === "node" || fs.existsSync(p));
+  const arm = existing.find((p) => nodeArch(p === "node" ? "node" : p) === "arm64");
+  if (arm) return arm === "node" ? "node" : arm;
+  return existing[0] ?? "node";
 }
 
 function childEnv() {
@@ -30,8 +55,8 @@ function childEnv() {
   }
   env.PATH = [
     path.join(root, "node_modules/.bin"),
-    "/usr/local/bin",
     "/opt/homebrew/bin",
+    "/usr/local/bin",
     process.env.PATH ?? "",
   ].join(":");
   return env;
@@ -76,7 +101,7 @@ async function ensureServer() {
 
   fs.writeFileSync(
     logPath,
-    `\n--- ${new Date().toISOString()} node=${node} ---\n`,
+    `\n--- ${new Date().toISOString()} node=${node} arch=${nodeArch(node)} ---\n`,
     { flag: "a" },
   );
   const logFd = fs.openSync(logPath, "a");
