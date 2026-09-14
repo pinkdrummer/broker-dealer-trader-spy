@@ -48,6 +48,14 @@ function findNode() {
   return existing[0] ?? "node";
 }
 
+function isAppleSilicon() {
+  try {
+    return execFileSync("sysctl", ["-n", "hw.optional.arm64"], { encoding: "utf8" }).trim() === "1";
+  } catch {
+    return fs.existsSync("/opt/homebrew/bin/node");
+  }
+}
+
 function childEnv() {
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
@@ -101,12 +109,18 @@ async function ensureServer() {
 
   fs.writeFileSync(
     logPath,
-    `\n--- ${new Date().toISOString()} node=${node} arch=${nodeArch(node)} ---\n`,
+    `\n--- ${new Date().toISOString()} node=${node} nodeArch=${nodeArch(node)} electronArch=${process.arch} appleSilicon=${isAppleSilicon()} ---\n`,
     { flag: "a" },
   );
   const logFd = fs.openSync(logPath, "a");
 
-  server = spawn(node, [wrapper, node, viteJs, "dev", "--host", HOST, "--port", String(PORT)], {
+  const forceArm = isAppleSilicon();
+  const cmd = forceArm ? "arch" : node;
+  const args = forceArm
+    ? ["-arm64", node, wrapper, node, viteJs, "dev", "--host", HOST, "--port", String(PORT)]
+    : [wrapper, node, viteJs, "dev", "--host", HOST, "--port", String(PORT)];
+
+  server = spawn(cmd, args, {
     cwd: root,
     env: childEnv(),
     stdio: ["ignore", logFd, logFd],
