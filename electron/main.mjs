@@ -6,11 +6,16 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const packaged = app.isPackaged;
+const root = packaged
+  ? app.getAppPath()
+  : path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
 const PORT = 8080;
 const URL = `http://${HOST}:${PORT}`;
-const logPath = path.join(root, "premium-alerts.log");
+const logPath = packaged
+  ? path.join(app.getPath("userData"), "premium-alerts.log")
+  : path.join(root, "premium-alerts.log");
 
 app.setName("Premium Alerts");
 
@@ -101,15 +106,22 @@ async function ensureServer() {
   const wrapper = path.join(root, "scripts/with-app-env.mjs");
   if (!fs.existsSync(viteJs)) {
     throw new Error(
-      "Vite is missing. In Terminal:\n\ncd " +
-        root +
-        "\nnpm install\n\nThen open Premium Alerts again.",
+      packaged
+        ? "This Mac build is missing the desk engine. Pull the latest repo and run npm run dist:mac again."
+        : "Vite is missing. In Terminal:\n\ncd " +
+            root +
+            "\nnpm install\n\nThen open Premium Alerts again.",
     );
   }
 
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  } catch {
+    /* userData exists */
+  }
   fs.writeFileSync(
     logPath,
-    `\n--- ${new Date().toISOString()} node=${node} nodeArch=${nodeArch(node)} electronArch=${process.arch} appleSilicon=${isAppleSilicon()} ---\n`,
+    `\n--- ${new Date().toISOString()} packaged=${packaged} root=${root} node=${node} nodeArch=${nodeArch(node)} electronArch=${process.arch} appleSilicon=${isAppleSilicon()} ---\n`,
     { flag: "a" },
   );
   const logFd = fs.openSync(logPath, "a");

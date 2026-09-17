@@ -1,6 +1,6 @@
-# Self-contained Mac build. Does not read tasty keys from disk or env.
-# Signing / notarization use APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
-# and the Developer ID Application identity in the login keychain.
+# Signed Mac build. Does not read tasty keys from disk or env.
+# Signing uses the Developer ID Application identity in the login keychain
+# plus APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID.
 # See docs/MAC_DISTRIBUTION.md.
 
 appId: com.premiumalerts.desk
@@ -9,19 +9,18 @@ copyright: Copyright © 2026 Jonathan Hawken
 directories:
   output: dist
   buildResources: build
-asar: true
+asar: false
 files:
   - electron/**
   - package.json
   - public/**
   - src/**
-  - scripts/with-app-env.mjs
-  - scripts/app-env-plugin.mjs
-  - scripts/grok-pwa-plugin.mjs
-  - scripts/grok-pwa-shared.mjs
-  - scripts/migration-plan.mjs
+  - scripts/**
+  - server/**
+  - migrations/**
   - vite.config.ts
   - tsconfig.json
+  - node_modules/**
 mac:
   category: public.app-category.finance
   icon: public/__grok/icon-180.png
