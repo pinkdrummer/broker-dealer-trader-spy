@@ -23,6 +23,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Sheet } from "@/components/ui/sheet";
 import { AddForm, SettingsForm } from "@/components/desk-dialogs";
 import { ContractEditor, ContractRow, MobileCard, tone } from "@/components/contract-panel";
+import { StatusPanel } from "@/components/status-panel";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -65,6 +66,7 @@ export function Desk() {
   const lastCheck = useBook((s) => s.lastCheck);
   const tastyConnected = useBook((s) => s.tastyConnected);
   const pullError = useBook((s) => s.pullError);
+  const tab = useBook((s) => s.tab);
   const rows = useMemo(() => visibleBook(book, desk, filter), [book, desk, filter]);
   const groups = useMemo(() => grouped(rows), [rows]);
   const stats = useMemo(() => summarize(rows), [rows]);
@@ -120,7 +122,7 @@ export function Desk() {
             const res = await fetchTastyBook({
               data: { clientSecret: tastySecret, refreshToken: tastyToken, account: tastyAccount },
             });
-            if (!cancelled) useBook.getState().applyTasty(res.rows);
+            if (!cancelled) useBook.getState().applyTasty(res.rows, res.snapshot);
           } catch (e) {
             if (!cancelled) {
               useBook.getState().setPullError(e instanceof Error ? e.message : "Pull failed");
@@ -177,6 +179,36 @@ export function Desk() {
         </div>
       </header>
 
+      <div className="flex gap-2 px-4 pt-3">
+        {(
+          [
+            ["status", "Account"],
+            ["book", "Book"],
+            ["archive", "Archive"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => useBook.getState().setTab(id)}
+            className={cn(
+              "h-11 flex-1 rounded-full border px-4 text-sm md:flex-none",
+              tab === id ? "border-accent bg-elevated text-fg" : "border-border text-muted",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "status" ? <div className="pt-4"><StatusPanel /></div> : null}
+      {tab === "archive" ? (
+        <p className="px-4 py-16 text-center text-sm text-muted text-pretty">
+          Archive is next. Closed trades and notes land here.
+        </p>
+      ) : null}
+      {tab === "book" ? (
+        <>
       <div className="flex gap-2 px-4 pt-3">
         {([
           ["premium", "Premium"],
@@ -291,6 +323,8 @@ export function Desk() {
       ) : (
         <Empty desk={desk} onAdd={() => setAddOpen(true)} />
       )}
+        </>
+      ) : null}
 
       <Sheet
         open={Boolean(selected)}

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { AccountSnapshot, MarginType } from "./account";
 import {
   bsDelta,
   classifyDesk,
@@ -28,6 +29,7 @@ type TastyPosition = {
   "mark-price"?: string | number;
   "close-price"?: string | number;
   "expires-at"?: string;
+  "created-at"?: string;
 };
 
 function num(v: string | number | undefined | null): number {
@@ -73,6 +75,14 @@ type MetricItem = {
   "implied-volatility-rank"?: string | number;
   "implied-volatility-index-rank"?: string | number;
   "tw-implied-volatility-index-rank"?: string | number;
+  "dividend-ex-date"?: string;
+  "dividend-next-date"?: string;
+  "dividend-pay-date"?: string;
+  earnings?: {
+    "expected-report-date"?: string;
+    "report-date"?: string;
+    "expected-report-date-str"?: string;
+  } | null;
   "option-expiration-implied-volatilities"?: {
     "expiration-date"?: string;
     "implied-volatility"?: string | number;
@@ -157,9 +167,8 @@ async function enrichGreeks(
     const ivr = m ? ivRankOf(m) : null;
     const iv = m ? expIv(m, row.exp) : null;
     const spot = spotBy.get(key) ?? 0;
-    const raw =
-      iv && spot
-        ? bsDelta({
+    const raw = iv && spot
+      ? bsDelta({
             spot,
             strike: row.strike,
             years: yearsToExpiry(row.exp),
@@ -168,13 +177,20 @@ async function enrichGreeks(
           })
         : null;
     const delta = raw == null ? null : signedDelta(raw, row.side);
-    return { ...row, ivr, delta };
+    const earningsDate = m?.earnings
+      ? String(m.earnings["expected-report-date"] || m.earnings["report-date"] || "").slice(0, 10) ||
+        null
+      : null;
+    const exDivDate = m
+      ? String(m["dividend-ex-date"] || m["dividend-next-date"] || "").slice(0, 10) || null
+      : null;
+    return { ...row, ivr, delta, earningsDate, exDivDate };
   });
 }
 
 export const fetchTastyBook = createServerFn({ method: "POST" })
   .validator((data: TastyInput) => data)
-  .handler(async ({ data }): Promise<{ account: string; rows: Contract[] }> => {
+  .handler(async ({ data }): Promise<{ account: string; rows: Contract[]; snapshot: AccountSnapshot }> => {
     const secret = data.clientSecret.trim();
     const refresh = data.refreshToken.trim();
     if (!secret || !refresh) {
@@ -250,9 +266,90 @@ export const fetchTastyBook = createServerFn({ method: "POST" })
         desk: classifyDesk(parsed.und, parsed.exp),
         ivr: null,
         delta: null,
+        kind: "option",
+        openedAt: p["created-at"] ? String(p["created-at"]) : null,
+      });
+    }
+    for (const p of raw) {
+      const type = String(p["instrument-type"] || "").toLowerCase();
+      if (!type.includes("equity") || type.includes("option")) continue;
+      const qty = Math.abs(num(p.quantity));
+      if (qty === 0) continue;
+      const und = String(p["underlying-symbol"] || p.symbol || "").toUpperCase();
+      if (!und) continue;
+      const short = String(p["quantity-direction"] || "").toLowerCase() === "short";
+      const basis = num(p["average-open-price"]);
+      const mark = num(p["mark-price"] || p.mark || p["close-price"]);
+      rows.push({
+        key: `${und}|share`,
+        und,
+        exp: "",
+        strike: 0,
+        right: "C",
+        side: short ? "S" : "L",
+        qty,
+        open: basis * qty,
+        mark,
+        source: "tasty",
+        desk: "premium",
+        ivr: null,
+        delta: short ? -qty : qty,
+        kind: "share",
+        openedAt: p["created-at"] ? String(p["created-at"]) : null,
       });
     }
     rows.sort((a, b) => a.und.localeCompare(b.und) || a.exp.localeCompare(b.exp));
-    const enriched = await enrichGreeks(headers, rows);
-    return { account, rows: enriched };
+    const enriched = await enrichGreeks(headers, rows.filter((r) => r.kind !== "share"));
+    const shares = rows.filter((r) => r.kind === "share");
+    const all = [...enriched, ...shares];
+
+    let netLiq = 0;
+    let bpUsed = 0;
+    let bpAvailable = 0;
+    let margin: MarginType | null = null;
+    try {
+      const bal = await tastyJson(`https://api.tastyworks.com/accounts/${account}/balances`, {
+        headers,
+      });
+      const b = (bal.data ?? bal) as Record<string, unknown>;
+      netLiq = num(b["net-liquidating-value"] as string);
+      bpAvailable = num(
+        (b["derivative-buying-power"] as string) || (b["available-trading-funds"] as string),
+      );
+      bpUsed = num(b["used-derivative-buying-power"] as string);
+      if (!(bpUsed > 0)) bpUsed = num(b["maintenance-requirement"] as string);
+    } catch {
+      // Snapshot stays empty; positions still load.
+    }
+
+    let vix: number | null = null;
+    let spy: number | null = null;
+    try {
+      const quotes = await tastyJson(
+        "https://api.tastyworks.com/market-data/by-type?equity=SPY&index=VIX",
+        { headers },
+      );
+      const qItems = ((quotes.data as { items?: QuoteItem[] })?.items) || [];
+      for (const q of qItems) {
+        const sym = String(q.symbol || "").toUpperCase();
+        const px = num(q.mark || q.last || q.mid);
+        if (sym === "VIX" && px > 0) vix = px;
+        if (sym === "SPY" && px > 0) spy = px;
+      }
+    } catch {
+      // Lane math degrades without a spot.
+    }
+
+    const snapshot: AccountSnapshot = {
+      account,
+      netLiq,
+      bpUsed,
+      bpAvailable,
+      margin,
+      vix,
+      spy,
+      dayPl: null,
+      asOf: new Date().toISOString(),
+    };
+    return { account, rows: all, snapshot };
   });

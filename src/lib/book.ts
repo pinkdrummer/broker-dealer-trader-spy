@@ -3,6 +3,7 @@ export type Right = "C" | "P";
 export type Source = "demo" | "tasty" | "manual";
 export type DeskKind = "premium" | "zero";
 export type Filter = "all" | "S" | "L" | "neg" | "pos";
+export type InstrumentKind = "share" | "option" | "future";
 
 export type Contract = {
   key: string;
@@ -22,6 +23,11 @@ export type Contract = {
   ivr: number | null;
   /** Signed delta per contract (short flips the sign). */
   delta: number | null;
+  kind?: InstrumentKind;
+  openedAt?: string | null;
+  theta?: number | null;
+  earningsDate?: string | null;
+  exDivDate?: string | null;
 };
 
 export type AlertSettings = {
@@ -123,6 +129,14 @@ export function isIndexRoot(und: string): boolean {
 }
 
 export function metrics(c: Contract) {
+  if (c.kind === "share") {
+    const markDollars = c.mark * c.qty;
+    const pl = markDollars - c.open;
+    const pct = c.open > 0 ? (pl / c.open) * 100 : null;
+    const vs = "stock";
+    const openPerShare = c.qty > 0 ? c.open / c.qty : 0;
+    return { markDollars, pl, pct, vs, openPerShare };
+  }
   const markDollars = c.mark * c.qty * 100;
   const pl = c.side === "S" ? c.open - markDollars : markDollars - c.open;
   const pct = c.open > 0 ? (pl / c.open) * 100 : null;
@@ -304,12 +318,15 @@ function c(
   desk: DeskKind = "premium",
   ivr: number | null = null,
   delta: number | null = null,
+  extra: Partial<Contract> = {},
 ): Contract {
   const row = { und, exp, strike, right, side, qty, mark, source: "demo" as const, desk, ivr, delta };
   return {
     ...row,
     key: contractKey(row),
-    open: openPerShare * qty * 100,
+    open: extra.kind === "share" ? extra.open ?? openPerShare * qty : openPerShare * qty * 100,
+    kind: extra.kind ?? "option",
+    ...extra,
   };
 }
 
@@ -329,6 +346,12 @@ export const DEMO_BOOK: Contract[] = [
   c("LOW", "2026-10-16", 190, "P", "S", 1, 3.4, 2.72, "premium", 22, 0.26),
   c("TSLA", "2027-01-15", 250, "C", "L", 1, 40.0, 48.0, "premium", 55, 0.62),
   c("TSLA", "2027-06-18", 200, "C", "L", 1, 55.0, 52.25, "premium", 55, 0.71),
+  c("OKTA", "", 0, "C", "L", 100, 0, 209.7, "premium", null, 100, {
+    key: "OKTA|share",
+    kind: "share",
+    open: 18_400,
+    earningsDate: "2026-12-02",
+  }),
 ];
 
 /** Same-day SPX credit spreads, ~$50 net per wing. Expiry is today (ET). */

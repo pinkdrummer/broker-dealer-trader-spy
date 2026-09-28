@@ -182,8 +182,8 @@ export function SettingsForm({ onClose }: { onClose: () => void }) {
               const res = await fetchTastyBook({
                 data: { clientSecret: secret, refreshToken: token, account },
               });
-              useBook.getState().applyTasty(res.rows);
-              toast(`Loaded ${res.rows.length} contracts from ${res.account}`);
+              useBook.getState().applyTasty(res.rows, res.snapshot);
+              toast(`Loaded ${res.rows.length} positions from ${res.account}`);
               onClose();
             } catch (e) {
               setErr(e instanceof Error ? e.message : "Could not reach tastytrade");

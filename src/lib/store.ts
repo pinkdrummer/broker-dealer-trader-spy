@@ -15,6 +15,12 @@ import {
 } from "./book";
 import { type DeskBackup } from "./backup";
 import {
+  DEFAULT_ACCOUNT_SETTINGS,
+  DEMO_SNAPSHOT,
+  type AccountSettings,
+  type AccountSnapshot,
+} from "./account";
+import {
   guardedStateStorage,
   openPersistWrites,
   PERSIST_KEY,
@@ -39,6 +45,9 @@ type State = {
   ntfyTopic: string;
   alertCooldownMin: number;
   lastFired: Record<string, number>;
+  tab: "status" | "book" | "archive";
+  accountSettings: AccountSettings;
+  snapshot: AccountSnapshot | null;
   setFilter: (f: Filter) => void;
   setDesk: (d: DeskKind) => void;
   select: (key: string | null) => void;
@@ -48,7 +57,7 @@ type State = {
   upsert: (c: Contract) => void;
   remove: (key: string) => void;
   loadDemo: () => void;
-  applyTasty: (rows: Contract[]) => void;
+  applyTasty: (rows: Contract[], snapshot?: AccountSnapshot | null) => void;
   setAlerts: (key: string, next: AlertSettings) => void;
   clearAlerts: (key: string) => void;
   setDefaultRungs: (next: AlertSettings) => void;
@@ -59,6 +68,9 @@ type State = {
   markFired: (key: string, at: number) => void;
   setAlertCooldownMin: (min: number) => void;
   restoreBackup: (b: DeskBackup) => void;
+  setTab: (tab: State["tab"]) => void;
+  setAccountSettings: (next: Partial<AccountSettings>) => void;
+  setSnapshot: (snapshot: AccountSnapshot | null) => void;
 };
 
 function withDesk(c: Contract): Contract {
@@ -67,6 +79,7 @@ function withDesk(c: Contract): Contract {
     desk: c.desk ?? classifyDesk(c.und, c.exp),
     ivr: c.ivr ?? null,
     delta: c.delta ?? null,
+    kind: c.kind ?? "option",
   };
 }
 
@@ -91,6 +104,9 @@ export const useBook = create<State>()(
       ntfyTopic: "",
       alertCooldownMin: DEFAULT_COOLDOWN_MIN,
       lastFired: {},
+      tab: "status",
+      accountSettings: { ...DEFAULT_ACCOUNT_SETTINGS },
+      snapshot: DEMO_SNAPSHOT,
       setFilter: (filter) => set({ filter }),
       setDesk: (desk) => set({ desk, selectedKey: null, filter: "all" }),
       select: (selectedKey) => set({ selectedKey }),
@@ -115,14 +131,16 @@ export const useBook = create<State>()(
           tastyConnected: false,
           lastSync: null,
           pullError: null,
+          snapshot: DEMO_SNAPSHOT,
         }),
-      applyTasty: (rows) =>
+      applyTasty: (rows, snapshot) =>
         set((s) => {
           if (rows.length === 0 && s.book.length > 0) {
             return {
               tastyConnected: true,
               lastSync: new Date().toISOString(),
               pullError: "Tasty returned no positions — left the current book in place.",
+              snapshot: snapshot ?? s.snapshot,
             };
           }
           const mapped = rows.map(withDesk);
@@ -133,6 +151,7 @@ export const useBook = create<State>()(
             tastyConnected: true,
             lastSync: new Date().toISOString(),
             pullError: null,
+            snapshot: snapshot ?? s.snapshot,
           };
         }),
       setAlerts: (key, next) => set((s) => ({ alerts: { ...s.alerts, [key]: next } })),
@@ -169,6 +188,10 @@ export const useBook = create<State>()(
           pullError: null,
           selectedKey: null,
         }),
+      setTab: (tab) => set({ tab }),
+      setAccountSettings: (next) =>
+        set((s) => ({ accountSettings: { ...s.accountSettings, ...next } })),
+      setSnapshot: (snapshot) => set({ snapshot }),
     }),
     {
       name: PERSIST_KEY,
@@ -190,6 +213,9 @@ export const useBook = create<State>()(
         ntfyTopic: s.ntfyTopic,
         alertCooldownMin: s.alertCooldownMin,
         lastFired: s.lastFired,
+        tab: s.tab,
+        accountSettings: s.accountSettings,
+        snapshot: s.snapshot,
       }),
       merge: (persisted, current) => {
         if (!persisted || typeof persisted !== "object") return current;
@@ -201,7 +227,13 @@ export const useBook = create<State>()(
         const alertCooldownMin = clampCooldown(p.alertCooldownMin ?? current.alertCooldownMin);
         const lastFired =
           p.lastFired && typeof p.lastFired === "object" ? p.lastFired : current.lastFired;
-        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired };
+        const accountSettings = {
+          ...DEFAULT_ACCOUNT_SETTINGS,
+          ...(p.accountSettings && typeof p.accountSettings === "object" ? p.accountSettings : {}),
+        };
+        const snapshot = p.snapshot && typeof p.snapshot === "object" ? p.snapshot : current.snapshot;
+        const tab = p.tab === "book" || p.tab === "archive" || p.tab === "status" ? p.tab : current.tab;
+        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, accountSettings, snapshot, tab };
       },
     },
   ),
@@ -257,7 +289,7 @@ function migrateFilter(raw: unknown): Filter | undefined {
 }
 
 export function visibleBook(book: Contract[], desk: DeskKind, filter: Filter): Contract[] {
-  let rows = book.filter((c) => (c.desk ?? "premium") === desk);
+  let rows = book.filter((c) => (c.kind ?? "option") !== "share" && (c.desk ?? "premium") === desk);
   if (filter === "S" || filter === "L") rows = rows.filter((c) => c.side === filter);
   if (filter === "neg") rows = rows.filter((c) => (metrics(c).pct ?? 0) < 0);
   if (filter === "pos") rows = rows.filter((c) => (metrics(c).pct ?? 0) >= 0);
