@@ -24,6 +24,7 @@ import {
   type Side,
 } from "@/lib/book";
 import { riskLabel, riskShapeOf } from "@/lib/classify";
+import { tradeForContract } from "@/lib/trades";
 import { useBook } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,6 +102,7 @@ export function ContractRow({
   const held = daysHeldLabel(c.openedAt);
   const events = eventMarks(c);
   const isShare = c.kind === "share";
+  const trade = useBook((s) => tradeForContract(s.trades, c.key));
   return (
     <tr
       onClick={onClick}
@@ -128,6 +130,7 @@ export function ContractRow({
           {isShare ? "Stock" : tenorLabel(c.exp)}
           {held ? ` · ${held}` : ""}
           {events.length ? ` · ${events.join(" · ")}` : ""}
+          {trade?.notes ? ` · ${trade.notes.split("\n")[0]}` : ""}
         </p>
       </td>
       <td className="py-3 pr-3 text-right font-mono tabular-nums">{c.qty}</td>
@@ -222,6 +225,8 @@ export function ContractEditor({ c }: { c: Contract }) {
           : `50% of debit is a mark of ${moneyMark(targetMark(c, 50))}.`}
       </p>
 
+      <NoteBox contractKey={c.key} />
+
       <Label htmlFor="mark">Mark (per share)</Label>
       <div className="mb-5 flex gap-2">
         <Input
@@ -314,6 +319,33 @@ export function ContractEditor({ c }: { c: Contract }) {
         ) : null}
       </div>
     </SheetContent>
+  );
+}
+
+function NoteBox({ contractKey }: { contractKey: string }) {
+  const trades = useBook((s) => s.trades);
+  const trade = tradeForContract(trades, contractKey);
+  if (!trade) {
+    return (
+      <p className="mb-5 text-xs text-subtle">
+        Notes attach after the book syncs this line into a ticket.
+      </p>
+    );
+  }
+  return (
+    <div className="mb-5">
+      <Label htmlFor={`note-${trade.id}`}>Notes on this ticket</Label>
+      <p className="mb-2 text-xs text-subtle">
+        Stays with the trade through a roll. {trade.label}
+      </p>
+      <textarea
+        id={`note-${trade.id}`}
+        value={trade.notes}
+        onChange={(e) => useBook.getState().setTradeNote(trade.id, e.target.value)}
+        placeholder="Plan, catalyst, what you will do at −100%."
+        className="min-h-24 w-full rounded-md border border-border bg-elevated px-3 py-2 text-sm text-fg placeholder:text-subtle"
+      />
+    </div>
   );
 }
 

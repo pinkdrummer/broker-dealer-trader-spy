@@ -26,6 +26,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { AddForm, SettingsForm } from "@/components/desk-dialogs";
 import { ContractEditor, ContractRow, MobileCard, tone } from "@/components/contract-panel";
 import { StatusPanel } from "@/components/status-panel";
+import { ArchivePanel } from "@/components/archive-panel";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -267,11 +268,7 @@ export function Desk() {
       </div>
 
       {tab === "status" ? <div className="pt-4"><StatusPanel /></div> : null}
-      {tab === "archive" ? (
-        <p className="px-4 py-16 text-center text-sm text-muted text-pretty">
-          Archive is next. Closed trades and notes land here.
-        </p>
-      ) : null}
+      {tab === "archive" ? <ArchivePanel /> : null}
       {tab === "book" ? (
         <>
       <div className="flex flex-wrap gap-2 px-4 pt-3">

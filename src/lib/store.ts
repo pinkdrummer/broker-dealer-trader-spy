@@ -22,6 +22,7 @@ import {
   type AccountSettings,
   type AccountSnapshot,
 } from "./account";
+import { setTradeNotes, syncTrades, type DeskTrade } from "./trades";
 import {
   guardedStateStorage,
   openPersistWrites,
@@ -52,6 +53,7 @@ type State = {
   tab: "status" | "book" | "archive";
   accountSettings: AccountSettings;
   snapshot: AccountSnapshot | null;
+  trades: DeskTrade[];
   setFilter: (f: Filter) => void;
   setDesk: (d: DeskKind) => void;
   toggleBookKind: (k: BookKind) => void;
@@ -77,6 +79,7 @@ type State = {
   setTab: (tab: State["tab"]) => void;
   setAccountSettings: (next: Partial<AccountSettings>) => void;
   setSnapshot: (snapshot: AccountSnapshot | null) => void;
+  setTradeNote: (id: string, notes: string) => void;
 };
 
 function withDesk(c: Contract): Contract {
@@ -115,6 +118,7 @@ export const useBook = create<State>()(
       tab: "status",
       accountSettings: { ...DEFAULT_ACCOUNT_SETTINGS },
       snapshot: DEMO_SNAPSHOT,
+      trades: [],
       setFilter: (filter) => set({ filter }),
       setDesk: (desk) => set({ desk, selectedKey: null, filter: "all" }),
       toggleBookKind: (k) =>
@@ -134,20 +138,28 @@ export const useBook = create<State>()(
           const row = withDesk(c);
           const i = s.book.findIndex((x) => x.key === row.key);
           const book = i >= 0 ? s.book.map((x, idx) => (idx === i ? row : x)) : [...s.book, row];
-          return { book };
+          return { book, trades: syncTrades(s.trades, book) };
         }),
       remove: (key) =>
-        set((s) => ({
-          book: s.book.filter((c) => c.key !== key),
-          selectedKey: s.selectedKey === key ? null : s.selectedKey,
-        })),
+        set((s) => {
+          const book = s.book.filter((c) => c.key !== key);
+          return {
+            book,
+            selectedKey: s.selectedKey === key ? null : s.selectedKey,
+            trades: syncTrades(s.trades, book),
+          };
+        }),
       loadDemo: () =>
-        set({
-          book: fullDemo(),
-          tastyConnected: false,
-          lastSync: null,
-          pullError: null,
-          snapshot: DEMO_SNAPSHOT,
+        set((s) => {
+          const book = fullDemo();
+          return {
+            book,
+            tastyConnected: false,
+            lastSync: null,
+            pullError: null,
+            snapshot: DEMO_SNAPSHOT,
+            trades: syncTrades(s.trades, book),
+          };
         }),
       applyTasty: (rows, snapshot) =>
         set((s) => {
@@ -162,12 +174,14 @@ export const useBook = create<State>()(
           const mapped = rows.map(withDesk);
           const tastyKeys = new Set(mapped.map((r) => r.key));
           const kept = s.book.filter((c) => c.source === "manual" && !tastyKeys.has(c.key));
+          const book = [...mapped, ...kept];
           return {
-            book: [...mapped, ...kept],
+            book,
             tastyConnected: true,
             lastSync: new Date().toISOString(),
             pullError: null,
             snapshot: snapshot ?? s.snapshot,
+            trades: syncTrades(s.trades, book),
           };
         }),
       setAlerts: (key, next) => set((s) => ({ alerts: { ...s.alerts, [key]: next } })),
@@ -209,6 +223,7 @@ export const useBook = create<State>()(
       setAccountSettings: (next) =>
         set((s) => ({ accountSettings: { ...s.accountSettings, ...next } })),
       setSnapshot: (snapshot) => set({ snapshot }),
+      setTradeNote: (id, notes) => set((s) => ({ trades: setTradeNotes(s.trades, id, notes) })),
     }),
     {
       name: PERSIST_KEY,
@@ -235,6 +250,7 @@ export const useBook = create<State>()(
         tab: s.tab,
         accountSettings: s.accountSettings,
         snapshot: s.snapshot,
+        trades: s.trades,
       }),
       merge: (persisted, current) => {
         if (!persisted || typeof persisted !== "object") return current;
@@ -252,12 +268,14 @@ export const useBook = create<State>()(
           ...(p.accountSettings && typeof p.accountSettings === "object" ? p.accountSettings : {}),
         };
         const snapshot = p.snapshot && typeof p.snapshot === "object" ? p.snapshot : current.snapshot;
+        const rawTrades = Array.isArray(p.trades) ? p.trades : current.trades;
+        const trades = rawTrades.length ? rawTrades : syncTrades([], book);
         const tab = p.tab === "book" || p.tab === "archive" || p.tab === "status" ? p.tab : current.tab;
         const bookKinds = {
           ...DEFAULT_BOOK_KINDS,
           ...(p.bookKinds && typeof p.bookKinds === "object" ? p.bookKinds : {}),
         };
-        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds };
+        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds, trades };
       },
     },
   ),
