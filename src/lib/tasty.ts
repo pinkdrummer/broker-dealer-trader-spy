@@ -10,6 +10,7 @@ import {
   yearsToExpiry,
   type Contract,
 } from "./book";
+import { DEMO_TAPE, TAPE_SPECS, type TapeQuote } from "./tape";
 
 type TastyInput = {
   clientSecret: string;
@@ -94,7 +95,59 @@ type QuoteItem = {
   mark?: string | number;
   last?: string | number;
   mid?: string | number;
+  "prev-close"?: string | number;
+  close?: string | number;
+  "day-high-price"?: string | number;
+  "day-low-price"?: string | number;
 };
+
+function quoteFromItem(q: QuoteItem, specName: string): TapeQuote | null {
+  const symbol = String(q.symbol || "").toUpperCase();
+  const last = num(q.mark || q.last || q.mid);
+  if (!symbol || !(last > 0)) return null;
+  const prev = num(q["prev-close"] || q.close) || null;
+  const changePct = prev && prev > 0 ? ((last - prev) / prev) * 100 : null;
+  return {
+    symbol,
+    name: specName,
+    last,
+    prevClose: prev,
+    changePct,
+    high: num(q["day-high-price"]) || null,
+    low: num(q["day-low-price"]) || null,
+  };
+}
+
+async function fetchTape(headers: Record<string, string>): Promise<TapeQuote[]> {
+  const equity = TAPE_SPECS.filter((s) => s.type === "equity").map((s) => s.symbol);
+  const index = TAPE_SPECS.filter((s) => s.type === "index").map((s) => s.symbol);
+  const crypto = TAPE_SPECS.filter((s) => s.type === "crypto").map((s) => s.symbol);
+  const params = new URLSearchParams();
+  if (equity.length) params.set("equity", equity.join(","));
+  if (index.length) params.set("index", index.join(","));
+  if (crypto.length) params.set("cryptocurrency", crypto.join(","));
+  try {
+    const quotes = await tastyJson(
+      `https://api.tastyworks.com/market-data/by-type?${params.toString()}`,
+      { headers },
+    );
+    const items = ((quotes.data as { items?: QuoteItem[] })?.items) || [];
+    const bySym = new Map<string, QuoteItem>();
+    for (const q of items) {
+      if (q.symbol) bySym.set(String(q.symbol).toUpperCase(), q);
+    }
+    const out: TapeQuote[] = [];
+    for (const spec of TAPE_SPECS) {
+      const hit = bySym.get(spec.symbol.toUpperCase());
+      if (!hit) continue;
+      const row = quoteFromItem(hit, spec.name);
+      if (row) out.push(row);
+    }
+    return out.length ? out : DEMO_TAPE;
+  } catch {
+    return DEMO_TAPE;
+  }
+}
 
 function ivRankOf(item: MetricItem): number | null {
   const raw = num(
@@ -190,7 +243,7 @@ async function enrichGreeks(
 
 export const fetchTastyBook = createServerFn({ method: "POST" })
   .validator((data: TastyInput) => data)
-  .handler(async ({ data }): Promise<{ account: string; rows: Contract[]; snapshot: AccountSnapshot }> => {
+  .handler(async ({ data }): Promise<{ account: string; rows: Contract[]; snapshot: AccountSnapshot; tape: TapeQuote[] }> => {
     const secret = data.clientSecret.trim();
     const refresh = data.refreshToken.trim();
     if (!secret || !refresh) {
@@ -322,23 +375,9 @@ export const fetchTastyBook = createServerFn({ method: "POST" })
       // Snapshot stays empty; positions still load.
     }
 
-    let vix: number | null = null;
-    let spy: number | null = null;
-    try {
-      const quotes = await tastyJson(
-        "https://api.tastyworks.com/market-data/by-type?equity=SPY&index=VIX",
-        { headers },
-      );
-      const qItems = ((quotes.data as { items?: QuoteItem[] })?.items) || [];
-      for (const q of qItems) {
-        const sym = String(q.symbol || "").toUpperCase();
-        const px = num(q.mark || q.last || q.mid);
-        if (sym === "VIX" && px > 0) vix = px;
-        if (sym === "SPY" && px > 0) spy = px;
-      }
-    } catch {
-      // Lane math degrades without a spot.
-    }
+    const tape = await fetchTape(headers);
+    const vix = tape.find((t) => t.symbol === "VIX")?.last ?? null;
+    const spy = tape.find((t) => t.symbol === "SPY")?.last ?? null;
 
     const snapshot: AccountSnapshot = {
       account,
@@ -351,5 +390,5 @@ export const fetchTastyBook = createServerFn({ method: "POST" })
       dayPl: null,
       asOf: new Date().toISOString(),
     };
-    return { account, rows: all, snapshot };
+    return { account, rows: all, snapshot, tape };
   });

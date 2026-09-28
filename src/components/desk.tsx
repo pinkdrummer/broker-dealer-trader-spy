@@ -27,6 +27,7 @@ import { AddForm, SettingsForm } from "@/components/desk-dialogs";
 import { ContractEditor, ContractRow, MobileCard, tone } from "@/components/contract-panel";
 import { StatusPanel } from "@/components/status-panel";
 import { ArchivePanel } from "@/components/archive-panel";
+import { MorningPanel } from "@/components/morning-panel";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -188,7 +189,7 @@ export function Desk() {
             const res = await fetchTastyBook({
               data: { clientSecret: tastySecret, refreshToken: tastyToken, account: tastyAccount },
             });
-            if (!cancelled) useBook.getState().applyTasty(res.rows, res.snapshot);
+            if (!cancelled) useBook.getState().applyTasty(res.rows, res.snapshot, res.tape);
           } catch (e) {
             if (!cancelled) {
               useBook.getState().setPullError(e instanceof Error ? e.message : "Pull failed");
@@ -248,6 +249,7 @@ export function Desk() {
       <div className="flex gap-2 px-4 pt-3">
         {(
           [
+            ["morning", "Morning"],
             ["status", "Account"],
             ["book", "Book"],
             ["archive", "Archive"],
@@ -267,6 +269,7 @@ export function Desk() {
         ))}
       </div>
 
+      {tab === "morning" ? <MorningPanel /> : null}
       {tab === "status" ? <div className="pt-4"><StatusPanel /></div> : null}
       {tab === "archive" ? <ArchivePanel /> : null}
       {tab === "book" ? (

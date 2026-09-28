@@ -212,7 +212,7 @@ export function SettingsForm({ onClose }: { onClose: () => void }) {
               const res = await fetchTastyBook({
                 data: { clientSecret: secret, refreshToken: token, account },
               });
-              useBook.getState().applyTasty(res.rows, res.snapshot);
+              useBook.getState().applyTasty(res.rows, res.snapshot, res.tape);
               toast(`Loaded ${res.rows.length} positions from ${res.account}`);
               onClose();
             } catch (e) {

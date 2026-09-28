@@ -22,6 +22,7 @@ import {
   type AccountSettings,
   type AccountSnapshot,
 } from "./account";
+import { DEMO_TAPE, type TapeQuote } from "./tape";
 import { setTradeNotes, syncTrades, type DeskTrade } from "./trades";
 import {
   guardedStateStorage,
@@ -50,10 +51,11 @@ type State = {
   alertCooldownMin: number;
   lastFired: Record<string, number>;
   lastItm: Record<string, boolean>;
-  tab: "status" | "book" | "archive";
+  tab: "status" | "book" | "archive" | "morning";
   accountSettings: AccountSettings;
   snapshot: AccountSnapshot | null;
   trades: DeskTrade[];
+  tape: TapeQuote[];
   setFilter: (f: Filter) => void;
   setDesk: (d: DeskKind) => void;
   toggleBookKind: (k: BookKind) => void;
@@ -64,7 +66,7 @@ type State = {
   upsert: (c: Contract) => void;
   remove: (key: string) => void;
   loadDemo: () => void;
-  applyTasty: (rows: Contract[], snapshot?: AccountSnapshot | null) => void;
+  applyTasty: (rows: Contract[], snapshot?: AccountSnapshot | null, tape?: TapeQuote[]) => void;
   setAlerts: (key: string, next: AlertSettings) => void;
   clearAlerts: (key: string) => void;
   setDefaultRungs: (next: AlertSettings) => void;
@@ -115,10 +117,11 @@ export const useBook = create<State>()(
       alertCooldownMin: DEFAULT_COOLDOWN_MIN,
       lastFired: {},
       lastItm: {},
-      tab: "status",
+      tab: "morning",
       accountSettings: { ...DEFAULT_ACCOUNT_SETTINGS },
       snapshot: DEMO_SNAPSHOT,
       trades: [],
+      tape: DEMO_TAPE,
       setFilter: (filter) => set({ filter }),
       setDesk: (desk) => set({ desk, selectedKey: null, filter: "all" }),
       toggleBookKind: (k) =>
@@ -159,9 +162,10 @@ export const useBook = create<State>()(
             pullError: null,
             snapshot: DEMO_SNAPSHOT,
             trades: syncTrades(s.trades, book),
+            tape: DEMO_TAPE,
           };
         }),
-      applyTasty: (rows, snapshot) =>
+      applyTasty: (rows, snapshot, tape) =>
         set((s) => {
           if (rows.length === 0 && s.book.length > 0) {
             return {
@@ -182,6 +186,7 @@ export const useBook = create<State>()(
             pullError: null,
             snapshot: snapshot ?? s.snapshot,
             trades: syncTrades(s.trades, book),
+            tape: tape && tape.length ? tape : s.tape,
           };
         }),
       setAlerts: (key, next) => set((s) => ({ alerts: { ...s.alerts, [key]: next } })),
@@ -251,6 +256,7 @@ export const useBook = create<State>()(
         accountSettings: s.accountSettings,
         snapshot: s.snapshot,
         trades: s.trades,
+        tape: s.tape,
       }),
       merge: (persisted, current) => {
         if (!persisted || typeof persisted !== "object") return current;
@@ -270,12 +276,16 @@ export const useBook = create<State>()(
         const snapshot = p.snapshot && typeof p.snapshot === "object" ? p.snapshot : current.snapshot;
         const rawTrades = Array.isArray(p.trades) ? p.trades : current.trades;
         const trades = rawTrades.length ? rawTrades : syncTrades([], book);
-        const tab = p.tab === "book" || p.tab === "archive" || p.tab === "status" ? p.tab : current.tab;
+        const tab =
+          p.tab === "book" || p.tab === "archive" || p.tab === "status" || p.tab === "morning"
+            ? p.tab
+            : current.tab;
+        const tape = Array.isArray(p.tape) && p.tape.length ? p.tape : current.tape;
         const bookKinds = {
           ...DEFAULT_BOOK_KINDS,
           ...(p.bookKinds && typeof p.bookKinds === "object" ? p.bookKinds : {}),
         };
-        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds, trades };
+        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds, trades, tape };
       },
     },
   ),
