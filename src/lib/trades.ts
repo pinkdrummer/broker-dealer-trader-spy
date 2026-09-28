@@ -5,6 +5,14 @@ import { optionPackages } from "./packages";
 export type TradeStatus = "open" | "closed";
 export type TradeKind = "option" | "share";
 
+export type OwnerId = "J" | "A" | "P";
+
+export const OWNERS: { id: OwnerId; name: string }[] = [
+  { id: "J", name: "Jonathan" },
+  { id: "A", name: "Aidan" },
+  { id: "P", name: "Palo" },
+];
+
 export type DeskTrade = {
   id: string;
   und: string;
@@ -12,6 +20,7 @@ export type DeskTrade = {
   status: TradeStatus;
   structure: string;
   notes: string;
+  owner: OwnerId | null;
   openedAt: string;
   closedAt: string | null;
   exp: string;
@@ -141,6 +150,7 @@ export function syncTrades(
       status: "open",
       structure: unit.structure,
       notes: "",
+      owner: null,
       openedAt: now.toISOString(),
       closedAt: null,
       exp: unit.exp,
@@ -165,4 +175,8 @@ export function tradeForContract(trades: DeskTrade[], key: string): DeskTrade | 
 
 export function setTradeNotes(trades: DeskTrade[], id: string, notes: string): DeskTrade[] {
   return trades.map((t) => (t.id === id ? { ...t, notes } : t));
+}
+
+export function setTradeOwner(trades: DeskTrade[], id: string, owner: OwnerId | null): DeskTrade[] {
+  return trades.map((t) => (t.id === id ? { ...t, owner } : t));
 }

@@ -29,6 +29,8 @@ import { StatusPanel } from "@/components/status-panel";
 import { ArchivePanel } from "@/components/archive-panel";
 import { MorningPanel } from "@/components/morning-panel";
 import { LedgerPanel } from "@/components/ledger-panel";
+import { PnlPanel } from "@/components/pnl-panel";
+import { detectRecords } from "@/lib/pnl";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -86,8 +88,19 @@ export function Desk() {
   const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
-    void useBook.persist.rehydrate();
-  }, []);
+    const { trades, records, announcedRecords, setRecords } = useBook.getState();
+    const { next, hits } = detectRecords(trades, records);
+    const fresh = hits.filter((h) => !announcedRecords.includes(`${h.kind}:${h.key}:${h.pl}`));
+    if (!fresh.length && next === records) return;
+    const announced = [
+      ...announcedRecords,
+      ...fresh.map((h) => `${h.kind}:${h.key}:${h.pl}`),
+    ].slice(-80);
+    setRecords(next, announced);
+    for (const h of fresh) {
+      fireAlert(`New ${h.kind} record · ${h.label} · ${money(h.pl)}`, "profit", "Record");
+    }
+  }, [book]);
 
   useEffect(() => {
     if (!watching) return;
@@ -247,12 +260,13 @@ export function Desk() {
         </div>
       </header>
 
-      <div className="flex gap-2 px-4 pt-3">
+      <div className="flex gap-2 overflow-x-auto px-4 pt-3">
         {(
           [
             ["morning", "Morning"],
             ["status", "Account"],
             ["book", "Book"],
+            ["pnl", "P/L"],
             ["archive", "Archive"],
             ["books", "Books"],
           ] as const
@@ -274,6 +288,7 @@ export function Desk() {
       {tab === "morning" ? <MorningPanel /> : null}
       {tab === "status" ? <div className="pt-4"><StatusPanel /></div> : null}
       {tab === "archive" ? <ArchivePanel /> : null}
+      {tab === "pnl" ? <PnlPanel /> : null}
       {tab === "books" ? <LedgerPanel /> : null}
       {tab === "book" ? (
         <>

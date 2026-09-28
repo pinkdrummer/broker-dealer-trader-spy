@@ -1,7 +1,7 @@
 import { money, pctLabel } from "@/lib/book";
 import { useBook } from "@/lib/store";
 import { tone } from "@/components/contract-panel";
-import { cn } from "@/lib/utils";
+import { OwnerBadge, OwnerPicker } from "@/components/owner-badge";
 
 export function ArchivePanel() {
   const trades = useBook((s) => s.trades);
@@ -26,7 +26,10 @@ export function ArchivePanel() {
           <article key={t.id} className="rounded-xl border border-border bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">{t.label}</p>
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <OwnerBadge owner={t.owner} />
+                  {t.label}
+                </p>
                 <p className="text-xs text-subtle">
                   {t.structure} · opened {t.openedAt.slice(0, 10)}
                   {t.closedAt ? ` · closed ${t.closedAt.slice(0, 10)}` : ""}
@@ -35,6 +38,12 @@ export function ArchivePanel() {
               <p className={cn("font-mono text-sm tabular-nums", tone(t.lastPl))}>
                 {money(t.lastPl)} · {pctLabel(t.lastPct)}
               </p>
+            </div>
+            <div className="mt-3">
+              <OwnerPicker
+                value={t.owner}
+                onChange={(id) => useBook.getState().setTradeOwner(t.id, id)}
+              />
             </div>
             <textarea
               value={t.notes}

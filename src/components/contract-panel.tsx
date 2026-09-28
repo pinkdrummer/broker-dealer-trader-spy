@@ -26,6 +26,7 @@ import {
 import { riskLabel, riskShapeOf } from "@/lib/classify";
 import { tradeForContract } from "@/lib/trades";
 import { useBook } from "@/lib/store";
+import { OwnerBadge, OwnerPicker } from "@/components/owner-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,6 +124,7 @@ export function ContractRow({
       </td>
       <td className="py-3 pr-3">
         <p className="flex flex-wrap items-baseline gap-2 font-mono text-sm">
+          <OwnerBadge owner={trade?.owner ?? null} />
           <span>{isShare ? `${c.qty} shares` : `${formatExp(c.exp)} ${strikeLabel(c)}`}</span>
           <span className={cn("tabular-nums", tone(pl))}>{money(pl)}</span>
         </p>
@@ -338,6 +340,13 @@ function NoteBox({ contractKey }: { contractKey: string }) {
       <p className="mb-2 text-xs text-subtle">
         Stays with the trade through a roll. {trade.label}
       </p>
+      <div className="mb-3">
+        <p className="mb-1 text-xs text-subtle">Who put this on</p>
+        <OwnerPicker
+          value={trade.owner}
+          onChange={(id) => useBook.getState().setTradeOwner(trade.id, id)}
+        />
+      </div>
       <textarea
         id={`note-${trade.id}`}
         value={trade.notes}
