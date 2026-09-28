@@ -48,6 +48,7 @@ type State = {
   ntfyTopic: string;
   alertCooldownMin: number;
   lastFired: Record<string, number>;
+  lastItm: Record<string, boolean>;
   tab: "status" | "book" | "archive";
   accountSettings: AccountSettings;
   snapshot: AccountSnapshot | null;
@@ -70,6 +71,7 @@ type State = {
   setNtfyTopic: (topic: string) => void;
   markSeen: (key: string, pct: number | null) => void;
   markFired: (key: string, at: number) => void;
+  setItm: (key: string, on: boolean) => void;
   setAlertCooldownMin: (min: number) => void;
   restoreBackup: (b: DeskBackup) => void;
   setTab: (tab: State["tab"]) => void;
@@ -109,6 +111,7 @@ export const useBook = create<State>()(
       ntfyTopic: "",
       alertCooldownMin: DEFAULT_COOLDOWN_MIN,
       lastFired: {},
+      lastItm: {},
       tab: "status",
       accountSettings: { ...DEFAULT_ACCOUNT_SETTINGS },
       snapshot: DEMO_SNAPSHOT,
@@ -183,6 +186,7 @@ export const useBook = create<State>()(
         set((s) => ({ lastPct: { ...s.lastPct, [key]: pct } })),
       markFired: (key, at) =>
         set((s) => ({ lastFired: { ...s.lastFired, [key]: at } })),
+      setItm: (key, on) => set((s) => ({ lastItm: { ...s.lastItm, [key]: on } })),
       setAlertCooldownMin: (min) => set({ alertCooldownMin: clampCooldown(min) }),
       restoreBackup: (b) =>
         set({
@@ -227,6 +231,7 @@ export const useBook = create<State>()(
         ntfyTopic: s.ntfyTopic,
         alertCooldownMin: s.alertCooldownMin,
         lastFired: s.lastFired,
+        lastItm: s.lastItm,
         tab: s.tab,
         accountSettings: s.accountSettings,
         snapshot: s.snapshot,
@@ -241,6 +246,7 @@ export const useBook = create<State>()(
         const alertCooldownMin = clampCooldown(p.alertCooldownMin ?? current.alertCooldownMin);
         const lastFired =
           p.lastFired && typeof p.lastFired === "object" ? p.lastFired : current.lastFired;
+        const lastItm = p.lastItm && typeof p.lastItm === "object" ? p.lastItm : current.lastItm;
         const accountSettings = {
           ...DEFAULT_ACCOUNT_SETTINGS,
           ...(p.accountSettings && typeof p.accountSettings === "object" ? p.accountSettings : {}),
@@ -251,7 +257,7 @@ export const useBook = create<State>()(
           ...DEFAULT_BOOK_KINDS,
           ...(p.bookKinds && typeof p.bookKinds === "object" ? p.bookKinds : {}),
         };
-        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, accountSettings, snapshot, tab, bookKinds };
+        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds };
       },
     },
   ),
@@ -288,7 +294,14 @@ function migrateDefaultRungs(raw: unknown): AlertSettings | undefined {
   if (sameRungs(r.profit, oldProfit) && sameRungs(r.loss, oldLoss)) {
     return cloneAlerts({ ...DEFAULT_ALERTS, enabled: r.enabled });
   }
-  return cloneAlerts(r);
+  return cloneAlerts({
+    enabled: r.enabled,
+    profit: r.profit,
+    loss: r.loss,
+    itm: r.itm !== false,
+    breakeven: r.breakeven === true,
+    legManage: r.legManage !== false,
+  });
 }
 
 function migrateAlertMap(alerts: Record<string, AlertSettings>): Record<string, AlertSettings> {

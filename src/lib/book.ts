@@ -35,12 +35,16 @@ export type Contract = {
   theta?: number | null;
   earningsDate?: string | null;
   exDivDate?: string | null;
+  spot?: number | null;
 };
 
 export type AlertSettings = {
   enabled: boolean;
   profit: number[];
   loss: number[];
+  itm: boolean;
+  breakeven: boolean;
+  legManage: boolean;
 };
 
 export const PROFIT_CHIPS = [20, 30, 40, 50, 60, 70, 80, 90, 100];
@@ -50,6 +54,9 @@ export const DEFAULT_ALERTS: AlertSettings = {
   enabled: true,
   profit: [...PROFIT_CHIPS],
   loss: [...LOSS_CHIPS],
+  itm: true,
+  breakeven: false,
+  legManage: true,
 };
 
 export function cloneAlerts(src: AlertSettings): AlertSettings {
@@ -57,6 +64,9 @@ export function cloneAlerts(src: AlertSettings): AlertSettings {
     enabled: src.enabled,
     profit: [...src.profit],
     loss: [...src.loss],
+    itm: src.itm !== false,
+    breakeven: src.breakeven === true,
+    legManage: src.legManage !== false,
   };
 }
 

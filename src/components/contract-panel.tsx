@@ -251,6 +251,21 @@ export function ContractEditor({ c }: { c: Contract }) {
         <span className="text-sm">Alerts for this contract</span>
         <Switch checked={st.enabled} onCheckedChange={(on) => save({ ...st, enabled: on })} />
       </div>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <span className="text-sm">ITM</span>
+        <Switch checked={st.itm !== false} onCheckedChange={(on) => save({ ...st, itm: on })} />
+      </div>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <span className="text-sm">Breakeven</span>
+        <Switch checked={st.breakeven === true} onCheckedChange={(on) => save({ ...st, breakeven: on })} />
+      </div>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <span className="text-sm">Leg −100% manage</span>
+        <Switch
+          checked={st.legManage !== false}
+          onCheckedChange={(on) => save({ ...st, legManage: on })}
+        />
+      </div>
 
       <p className="mb-2 text-xs uppercase tracking-wide text-subtle">Take profit</p>
       <ChipRow

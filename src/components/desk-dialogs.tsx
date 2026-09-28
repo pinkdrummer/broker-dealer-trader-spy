@@ -68,6 +68,36 @@ export function SettingsForm({ onClose }: { onClose: () => void }) {
           }
         />
       </div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="text-sm">ITM alert (once while inside)</span>
+        <Switch
+          checked={defaultRungs.itm !== false}
+          onCheckedChange={(on) => useBook.getState().setDefaultRungs({ ...defaultRungs, itm: on })}
+        />
+      </div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="text-sm">Breakeven alert</span>
+        <Switch
+          checked={defaultRungs.breakeven === true}
+          onCheckedChange={(on) =>
+            useBook.getState().setDefaultRungs({ ...defaultRungs, breakeven: on })
+          }
+        />
+      </div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="text-sm">Manage ping if a short leg is −100%</span>
+        <Switch
+          checked={defaultRungs.legManage !== false}
+          onCheckedChange={(on) =>
+            useBook.getState().setDefaultRungs({ ...defaultRungs, legManage: on })
+          }
+        />
+      </div>
+      <p className="mb-4 text-xs text-subtle text-pretty">
+        Profit and loss rungs fire on the package — the strangle, the vertical — not each wing.
+        A short leg at −100% of its own credit still pings even if the package is green. ITM stays
+        quiet until the option goes back out and comes in again.
+      </p>
       <p className="mb-2 text-xs uppercase tracking-wide text-subtle">Take profit</p>
       <ChipRow
         kind="profit"

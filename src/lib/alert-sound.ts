@@ -30,18 +30,35 @@ function tone(c: AudioCtx, freq: number, start: number, dur: number, gain: numbe
   osc.stop(start + dur + 0.02);
 }
 
-/** Two-note chime. Higher for a profit cross, lower for a give-back / loss. */
-export function playAlertSound(worse: boolean): void {
+export type AlertKind = "profit" | "loss" | "manage" | "itm" | "breakeven";
+
+export function playAlertSound(kind: AlertKind | boolean): void {
   unlockAlertSound();
   if (!ctx) return;
   const t = ctx.currentTime;
-  if (worse) {
+  const k: AlertKind = typeof kind === "boolean" ? (kind ? "loss" : "profit") : kind;
+  if (k === "profit") {
+    tone(ctx, 784, t, 0.12, 0.12);
+    tone(ctx, 1046, t + 0.12, 0.16, 0.12);
+    return;
+  }
+  if (k === "loss") {
     tone(ctx, 392, t, 0.16, 0.16);
     tone(ctx, 311, t + 0.14, 0.22, 0.16);
-  } else {
-    tone(ctx, 784, t, 0.12, 0.14);
-    tone(ctx, 1046, t + 0.12, 0.16, 0.14);
+    return;
   }
+  if (k === "manage") {
+    tone(ctx, 330, t, 0.12, 0.18);
+    tone(ctx, 247, t + 0.12, 0.14, 0.18);
+    tone(ctx, 196, t + 0.26, 0.28, 0.2);
+    return;
+  }
+  if (k === "itm") {
+    tone(ctx, 880, t, 0.08, 0.18);
+    tone(ctx, 220, t + 0.1, 0.28, 0.2);
+    return;
+  }
+  tone(ctx, 523, t, 0.18, 0.12);
 }
 
 export function playWatchArmedSound(): void {

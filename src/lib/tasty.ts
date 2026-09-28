@@ -184,7 +184,7 @@ async function enrichGreeks(
     const exDivDate = m
       ? String(m["dividend-ex-date"] || m["dividend-next-date"] || "").slice(0, 10) || null
       : null;
-    return { ...row, ivr, delta, earningsDate, exDivDate };
+    return { ...row, ivr, delta, earningsDate, exDivDate, spot: spot || null };
   });
 }
 

@@ -12,9 +12,11 @@ import {
   summarize,
   type Filter,
 } from "@/lib/book";
+import { crossedZero, isItm, itmShouldFire, legIsManage } from "@/lib/alerts-extra";
+import { optionPackages, packageMoneyLine } from "@/lib/packages";
 import { zeroWindow } from "@/lib/session";
 import { APP_NAME } from "@/lib/brand";
-import { playAlertSound, playWatchArmedSound, unlockAlertSound } from "@/lib/alert-sound";
+import { playAlertSound, playWatchArmedSound, unlockAlertSound, type AlertKind } from "@/lib/alert-sound";
 import { pushPhone } from "@/lib/notify";
 import { resolveAlerts, useBook, visibleBook } from "@/lib/store";
 import { fetchTastyBook } from "@/lib/tasty";
@@ -34,26 +36,31 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "pos", label: "Positive" },
 ];
 
-function fireAlert(msg: string, hit: string) {
-  const worse = hit.startsWith("<");
-  playAlertSound(worse);
-  if (worse) toast.error(msg);
-  else toast.success(msg);
+function fireAlert(msg: string, kind: AlertKind, title = APP_NAME) {
+  playAlertSound(kind);
+  if (kind === "profit" || kind === "breakeven") toast.success(msg);
+  else toast.error(msg);
   if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    new Notification(APP_NAME, { body: msg, silent: false });
+    new Notification(title, { body: msg, silent: false });
   }
   const topic = useBook.getState().ntfyTopic.trim();
   if (!topic) return;
+  const priority = kind === "manage" || kind === "itm" ? 5 : kind === "loss" ? 4 : 3;
   void pushPhone({
     data: {
       topic,
-      title: APP_NAME,
+      title,
       message: msg,
-      priority: worse ? 4 : 3,
+      priority,
     },
   }).catch(() => {
     /* phone push is best-effort */
   });
+}
+
+function kindFromHit(hit: string): AlertKind {
+  if (hit.includes("−") || hit.startsWith("<")) return "loss";
+  return "profit";
 }
 
 export function Desk() {
@@ -92,23 +99,80 @@ export function Desk() {
     let inflight = false;
 
     const check = () => {
-      const { book: live, lastPct, markSeen, lastFired, alertCooldownMin, markFired } =
-        useBook.getState();
+      const {
+        book: live,
+        lastPct,
+        lastItm,
+        markSeen,
+        lastFired,
+        alertCooldownMin,
+        markFired,
+        setItm,
+      } = useBook.getState();
       const now = Date.now();
-      for (const c of live) {
-        const st = resolveAlerts(c.key);
-        const { pct, pl, vs } = metrics(c);
-        const hits = crossedRungs(lastPct[c.key], pct, st);
-        const isFirst = lastPct[c.key] == null;
-        markSeen(c.key, pct);
-        if (isFirst) continue;
+      const pkgs = optionPackages(live);
+
+      for (const pkg of pkgs) {
+        const st = resolveAlerts(pkg.id);
+        const prev = lastPct[pkg.id];
+        const hits = crossedRungs(prev, pkg.pct, st);
+        const isFirst = prev == null;
+        markSeen(pkg.id, pkg.pct);
+        if (st.breakeven && !isFirst && crossedZero(prev, pkg.pct)) {
+          const key = fireKey(pkg.id, "BE");
+          if (!rungIsCooling(lastFired?.[key], now, alertCooldownMin)) {
+            markFired(key, now);
+            fireAlert(`${packageMoneyLine(pkg)}  breakeven`, "breakeven", "Breakeven");
+          }
+        }
+        if (isFirst || !st.enabled) continue;
         for (const hit of hits) {
-          const key = fireKey(c.key, hit);
+          const key = fireKey(pkg.id, hit);
           if (rungIsCooling(lastFired?.[key], now, alertCooldownMin)) continue;
           markFired(key, now);
-          fireAlert(`${contractLabel(c)}  ${hit} of ${vs}  P/L ${money(pl)}`, hit);
+          const kind = kindFromHit(hit);
+          fireAlert(
+            `${packageMoneyLine(pkg)}  ${hit}`,
+            kind,
+            kind === "profit" ? "Profit" : "Give-back",
+          );
         }
       }
+
+      for (const c of live) {
+        if (c.kind === "share") continue;
+        const st = resolveAlerts(c.key);
+        const { pct, pl, vs } = metrics(c);
+        const prev = lastPct[c.key];
+        const isFirst = prev == null;
+        markSeen(c.key, pct);
+
+        if (st.itm) {
+          const nowItm = isItm(c);
+          const step = itmShouldFire(lastItm[c.key], nowItm);
+          if (step.next != null) setItm(c.key, step.next);
+          if (step.fire) {
+            const key = fireKey(c.key, "ITM");
+            if (!rungIsCooling(lastFired?.[key], now, alertCooldownMin)) {
+              markFired(key, now);
+              fireAlert(`${contractLabel(c)}  ITM`, "itm", "ITM");
+            }
+          }
+        }
+
+        if (st.legManage && !isFirst && legIsManage(c, pct)) {
+          const key = fireKey(c.key, "LEG-100");
+          if (!rungIsCooling(lastFired?.[key], now, alertCooldownMin)) {
+            markFired(key, now);
+            fireAlert(
+              `${contractLabel(c)}  leg −100% of ${vs}  P/L ${money(pl)}`,
+              "manage",
+              "Manage · leg",
+            );
+          }
+        }
+      }
+
       useBook.getState().setLastCheck(new Date().toISOString());
     };
 
