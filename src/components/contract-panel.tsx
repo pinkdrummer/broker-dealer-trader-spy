@@ -17,10 +17,13 @@ import {
   strikeLabel,
   targetMark,
   tenorLabel,
+  daysHeldLabel,
+  eventMarks,
   type AlertSettings,
   type Contract,
   type Side,
 } from "@/lib/book";
+import { riskLabel, riskShapeOf } from "@/lib/classify";
 import { useBook } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +96,11 @@ export function ContractRow({
   const { pct, pl } = metrics(c);
   const st = useResolvedAlerts(c.key);
   const next = nextRung(pct, st);
+  const book = useBook((s) => s.book);
+  const shape = riskShapeOf(c, book);
+  const held = daysHeldLabel(c.openedAt);
+  const events = eventMarks(c);
+  const isShare = c.kind === "share";
   return (
     <tr
       onClick={onClick}
@@ -112,13 +120,15 @@ export function ContractRow({
         <SideMark side={c.side} />
       </td>
       <td className="py-3 pr-3">
-        <p className="flex items-baseline gap-2 font-mono text-sm">
-          <span>
-            {formatExp(c.exp)} {strikeLabel(c)}
-          </span>
+        <p className="flex flex-wrap items-baseline gap-2 font-mono text-sm">
+          <span>{isShare ? `${c.qty} shares` : `${formatExp(c.exp)} ${strikeLabel(c)}`}</span>
           <span className={cn("tabular-nums", tone(pl))}>{money(pl)}</span>
         </p>
-        <p className="text-xs text-subtle">{tenorLabel(c.exp)}</p>
+        <p className="text-xs text-subtle">
+          {isShare ? "Stock" : tenorLabel(c.exp)}
+          {held ? ` · ${held}` : ""}
+          {events.length ? ` · ${events.join(" · ")}` : ""}
+        </p>
       </td>
       <td className="py-3 pr-3 text-right font-mono tabular-nums">{c.qty}</td>
       <td className="py-3 pr-3 text-right font-mono tabular-nums">{moneyMark(c.mark)}</td>
@@ -129,9 +139,11 @@ export function ContractRow({
         <PctBar pct={pct} />
       </td>
       <td className={cn("py-3 pr-3 text-right font-mono text-sm font-medium tabular-nums", nextClass(next))}>
-        {next ?? "—"}
+        {isShare ? "—" : (next ?? "—")}
       </td>
-      <td className="py-3 text-xs text-muted">{st.enabled ? "On" : "Off"}</td>
+      <td className="py-3">
+        <span className="rounded-xs bg-elevated px-1.5 py-0.5 text-[11px] text-muted">{riskLabel(shape)}</span>
+      </td>
     </tr>
   );
 }
@@ -140,27 +152,37 @@ export function MobileCard({ c }: { c: Contract }) {
   const { pct, pl } = metrics(c);
   const st = useResolvedAlerts(c.key);
   const next = nextRung(pct, st);
+  const book = useBook((s) => s.book);
+  const shape = riskShapeOf(c, book);
+  const held = daysHeldLabel(c.openedAt);
+  const events = eventMarks(c);
+  const isShare = c.kind === "share";
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <SideMark side={c.side} />
-            <span className="font-mono text-sm">{contractLabel(c)}</span>
+            <span className="font-mono text-sm">{isShare ? `${c.und}  ${c.qty} sh` : contractLabel(c)}</span>
             <span className={cn("font-mono text-sm tabular-nums", tone(pl))}>{money(pl)}</span>
           </div>
           <p className="mt-1 text-xs text-muted">
-            Qty {c.qty} · Δ {deltaLabel(c.delta)} · IVR {ivrLabel(c.ivr)} · {tenorLabel(c.exp)}
+            {riskLabel(shape)} · {isShare ? "Stock" : tenorLabel(c.exp)}
+            {held ? ` · ${held}` : ""}
+            {events.length ? ` · ${events.join(" · ")}` : ""}
+            {isShare ? "" : ` · Δ ${deltaLabel(c.delta)}`}
           </p>
         </div>
         <p className={cn("shrink-0 font-mono text-base tabular-nums", tone(pct))}>{pctLabel(pct)}</p>
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <PctBar pct={pct} />
-        <p className={cn("font-mono text-sm font-medium tabular-nums", nextClass(next))}>
-          {next ? `next ${next}` : statusOf(pct)}
-        </p>
-      </div>
+      {isShare ? null : (
+        <div className="flex items-center justify-between gap-3">
+          <PctBar pct={pct} />
+          <p className={cn("font-mono text-sm font-medium tabular-nums", nextClass(next))}>
+            {next ? `next ${next}` : statusOf(pct)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

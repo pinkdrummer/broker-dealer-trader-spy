@@ -5,9 +5,11 @@ import {
   type Contract,
   type DeskKind,
   type Filter,
+  type BookKind,
   classifyDesk,
   cloneAlerts,
   DEFAULT_ALERTS,
+  DEFAULT_BOOK_KINDS,
   DEFAULT_COOLDOWN_MIN,
   clampCooldown,
   metrics,
@@ -34,6 +36,7 @@ type State = {
   selectedKey: string | null;
   filter: Filter;
   desk: DeskKind;
+  bookKinds: Record<BookKind, boolean>;
   watching: boolean;
   lastCheck: string | null;
   pullError: string | null;
@@ -50,6 +53,7 @@ type State = {
   snapshot: AccountSnapshot | null;
   setFilter: (f: Filter) => void;
   setDesk: (d: DeskKind) => void;
+  toggleBookKind: (k: BookKind) => void;
   select: (key: string | null) => void;
   setWatching: (on: boolean) => void;
   setLastCheck: (iso: string | null) => void;
@@ -93,6 +97,7 @@ export const useBook = create<State>()(
       selectedKey: null,
       filter: "all",
       desk: "premium",
+      bookKinds: { ...DEFAULT_BOOK_KINDS },
       watching: false,
       lastCheck: null,
       pullError: null,
@@ -109,6 +114,14 @@ export const useBook = create<State>()(
       snapshot: DEMO_SNAPSHOT,
       setFilter: (filter) => set({ filter }),
       setDesk: (desk) => set({ desk, selectedKey: null, filter: "all" }),
+      toggleBookKind: (k) =>
+        set((s) => {
+          const bookKinds = { ...s.bookKinds, [k]: !s.bookKinds[k] };
+          if (!bookKinds.options && !bookKinds.zero && !bookKinds.stocks) {
+            bookKinds[k] = true;
+          }
+          return { bookKinds, selectedKey: null };
+        }),
       select: (selectedKey) => set({ selectedKey }),
       setWatching: (watching) => set({ watching }),
       setLastCheck: (lastCheck) => set({ lastCheck }),
@@ -204,6 +217,7 @@ export const useBook = create<State>()(
         lastPct: s.lastPct,
         filter: s.filter,
         desk: s.desk,
+        bookKinds: s.bookKinds,
         watching: s.watching,
         tastySecret: s.tastySecret,
         tastyToken: s.tastyToken,
@@ -233,7 +247,11 @@ export const useBook = create<State>()(
         };
         const snapshot = p.snapshot && typeof p.snapshot === "object" ? p.snapshot : current.snapshot;
         const tab = p.tab === "book" || p.tab === "archive" || p.tab === "status" ? p.tab : current.tab;
-        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, accountSettings, snapshot, tab };
+        const bookKinds = {
+          ...DEFAULT_BOOK_KINDS,
+          ...(p.bookKinds && typeof p.bookKinds === "object" ? p.bookKinds : {}),
+        };
+        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, accountSettings, snapshot, tab, bookKinds };
       },
     },
   ),
@@ -288,8 +306,17 @@ function migrateFilter(raw: unknown): Filter | undefined {
   return undefined;
 }
 
-export function visibleBook(book: Contract[], desk: DeskKind, filter: Filter): Contract[] {
-  let rows = book.filter((c) => (c.kind ?? "option") !== "share" && (c.desk ?? "premium") === desk);
+export function visibleBook(
+  book: Contract[],
+  kinds: Record<BookKind, boolean>,
+  filter: Filter,
+): Contract[] {
+  let rows = book.filter((c) => {
+    if (c.kind === "share") return kinds.stocks;
+    const desk = c.desk ?? classifyDesk(c.und, c.exp);
+    if (desk === "zero") return kinds.zero;
+    return kinds.options;
+  });
   if (filter === "S" || filter === "L") rows = rows.filter((c) => c.side === filter);
   if (filter === "neg") rows = rows.filter((c) => (metrics(c).pct ?? 0) < 0);
   if (filter === "pos") rows = rows.filter((c) => (metrics(c).pct ?? 0) >= 0);

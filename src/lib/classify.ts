@@ -151,4 +151,18 @@ export function bookMix(rows: Contract[]): { defined: number; undefined: number;
   return mix;
 }
 
-export type { Right, Side };
+export function riskShapeOf(row: Contract, book: Contract[]): RiskShape {
+  const paired = pairCoveredCalls(book);
+  const undRows = book.filter((c) => c.und === row.und);
+  const raw = paired.get(row.key)?.shape ?? classifyLone(row).shape;
+  if (row.kind === "share") return "stock";
+  return definedFromStructure(structureOf(undRows), raw);
+}
+
+export function riskLabel(shape: RiskShape): string {
+  if (shape === "defined") return "Defined";
+  if (shape === "undefined") return "Undefined";
+  if (shape === "covered") return "Covered";
+  if (shape === "stock") return "Stock";
+  return "Long";
+}

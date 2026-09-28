@@ -10,9 +10,9 @@ import {
   money,
   rungIsCooling,
   summarize,
-  type DeskKind,
   type Filter,
 } from "@/lib/book";
+import { zeroWindow } from "@/lib/session";
 import { APP_NAME } from "@/lib/brand";
 import { playAlertSound, playWatchArmedSound, unlockAlertSound } from "@/lib/alert-sound";
 import { pushPhone } from "@/lib/notify";
@@ -60,6 +60,7 @@ export function Desk() {
   const book = useBook((s) => s.book);
   const filter = useBook((s) => s.filter);
   const desk = useBook((s) => s.desk);
+  const bookKinds = useBook((s) => s.bookKinds);
   const selectedKey = useBook((s) => s.selectedKey);
   const watching = useBook((s) => s.watching);
   const lastSync = useBook((s) => s.lastSync);
@@ -67,7 +68,7 @@ export function Desk() {
   const tastyConnected = useBook((s) => s.tastyConnected);
   const pullError = useBook((s) => s.pullError);
   const tab = useBook((s) => s.tab);
-  const rows = useMemo(() => visibleBook(book, desk, filter), [book, desk, filter]);
+  const rows = useMemo(() => visibleBook(book, bookKinds, filter), [book, bookKinds, filter]);
   const groups = useMemo(() => grouped(rows), [rows]);
   const stats = useMemo(() => summarize(rows), [rows]);
   const selected = rows.find((r) => r.key === selectedKey) ?? book.find((r) => r.key === selectedKey);
@@ -136,21 +137,21 @@ export function Desk() {
     };
 
     void tick();
-    const ms = desk === "zero" ? 15_000 : 30_000;
+    const ms = bookKinds.zero ? 15_000 : 30_000;
     const id = window.setInterval(() => void tick(), ms);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [watching, desk]);
+  }, [watching, bookKinds.zero]);
 
   const sourceLine = tastyConnected && lastSync
     ? `Tasty  ·  ${new Date(lastSync).toLocaleTimeString()}`
     : "Sample book  ·  edit or connect Tasty";
   const watchLine = watching && lastCheck
-    ? `Watching  ·  ${desk === "zero" ? "15s" : "30s"}  ·  ${new Date(lastCheck).toLocaleTimeString()}`
+    ? `Watching  ·  ${bookKinds.zero ? "15s" : "30s"}  ·  ${new Date(lastCheck).toLocaleTimeString()}`
     : watching
-      ? `Watching  ·  ${desk === "zero" ? "15s" : "30s"}`
+      ? `Watching  ·  ${bookKinds.zero ? "15s" : "30s"}`
       : sourceLine;
 
   return (
@@ -209,18 +210,21 @@ export function Desk() {
       ) : null}
       {tab === "book" ? (
         <>
-      <div className="flex gap-2 px-4 pt-3">
-        {([
-          ["premium", "Premium"],
-          ["zero", "0DTE"],
-        ] as const).map(([id, label]) => (
+      <div className="flex flex-wrap gap-2 px-4 pt-3">
+        {(
+          [
+            ["options", "Options"],
+            ["zero", "0DTE"],
+            ["stocks", "Stocks"],
+          ] as const
+        ).map(([id, label]) => (
           <button
             key={id}
             type="button"
-            onClick={() => useBook.getState().setDesk(id)}
+            onClick={() => useBook.getState().toggleBookKind(id)}
             className={cn(
-              "h-11 flex-1 rounded-full border px-4 text-sm md:flex-none",
-              desk === id ? "border-accent bg-elevated text-fg" : "border-border text-muted",
+              "h-11 rounded-full border px-4 text-sm",
+              bookKinds[id] ? "border-accent bg-elevated text-fg" : "border-border text-muted",
             )}
           >
             {label}
@@ -228,7 +232,9 @@ export function Desk() {
         ))}
       </div>
 
-      <SummaryStrip stats={stats} desk={desk} />
+      {bookKinds.zero ? <ZeroClock /> : null}
+
+      <SummaryStrip stats={stats} zeroOn={bookKinds.zero} />
 
       {pullError ? (
         <p className="px-4 pb-2 text-sm text-down">{pullError}</p>
@@ -271,7 +277,7 @@ export function Desk() {
                   <th className="pb-3 pr-3 text-right font-medium">%</th>
                   <th className="pb-3 pr-3 font-medium"> </th>
                   <th className="pb-3 pr-3 text-right font-medium">Next</th>
-                  <th className="pb-3 font-medium">Alerts</th>
+                  <th className="pb-3 font-medium">Shape</th>
                 </tr>
               </thead>
               {groups.map((g) => (
@@ -321,7 +327,7 @@ export function Desk() {
           </div>
         </>
       ) : (
-        <Empty desk={desk} onAdd={() => setAddOpen(true)} />
+        <Empty onAdd={() => setAddOpen(true)} />
       )}
         </>
       ) : null}
@@ -370,18 +376,45 @@ function WatchButton() {
   );
 }
 
+function ZeroClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const w = zeroWindow(now);
+  return (
+    <div className="px-4 pt-3">
+      <div
+        className={cn(
+          "rounded-xl border px-4 py-3",
+          w.state === "open"
+            ? "border-up/40 bg-up/10"
+            : w.state === "before"
+              ? "border-accent/40 bg-elevated"
+              : "border-border bg-surface",
+        )}
+      >
+        <p className="text-xs uppercase tracking-widest text-subtle">0DTE window</p>
+        <p className="text-sm font-medium">{w.label}</p>
+        <p className="font-mono text-xs text-subtle">{w.detail}</p>
+      </div>
+    </div>
+  );
+}
+
 function SummaryStrip({
   stats,
-  desk,
+  zeroOn,
 }: {
   stats: ReturnType<typeof summarize>;
-  desk: DeskKind;
+  zeroOn: boolean;
 }) {
   return (
     <section className="px-4 py-3">
       <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
         <Kpi label="Book P/L" value={money(stats.pl)} className={tone(stats.pl)} />
-        <Kpi label={desk === "zero" ? "Credit" : "Credit out"} value={money(stats.credit)} />
+        <Kpi label="Credit out" value={money(stats.credit)} />
         <Kpi
           label="Negative"
           value={String(stats.negative)}
@@ -393,9 +426,9 @@ function SummaryStrip({
           className={stats.positive ? "text-up" : undefined}
         />
       </div>
-      {desk === "zero" ? (
+      {zeroOn ? (
         <p className="mt-2 text-xs text-subtle text-pretty">
-          SPX credit spreads. Target: expire worthless. Morning window 9:30–11 ET.
+          New 0DTE entries only 9:30–11:00 ET. Target: expire worthless.
         </p>
       ) : null}
     </section>
@@ -419,13 +452,12 @@ function Kpi({
   );
 }
 
-function Empty({ desk, onAdd }: { desk: DeskKind; onAdd: () => void }) {
+function Empty({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="px-4 py-16 text-center">
       <p className="text-sm text-muted text-pretty">
-        {desk === "zero"
-          ? "No 0DTE contracts. Add an SPX leg, or pull from Tasty in Settings."
-          : "No contracts on this book. Add one, or pull from Tasty in Settings."}
+        Nothing on this filter. Flip Options / 0DTE / Stocks, add a line, or pull from Tasty in
+        Settings.
       </p>
       <Button className="mt-4" onClick={onAdd}>
         Add contract

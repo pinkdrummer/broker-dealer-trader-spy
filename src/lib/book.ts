@@ -4,6 +4,13 @@ export type Source = "demo" | "tasty" | "manual";
 export type DeskKind = "premium" | "zero";
 export type Filter = "all" | "S" | "L" | "neg" | "pos";
 export type InstrumentKind = "share" | "option" | "future";
+export type BookKind = "options" | "zero" | "stocks";
+
+export const DEFAULT_BOOK_KINDS: Record<BookKind, boolean> = {
+  options: true,
+  zero: true,
+  stocks: true,
+};
 
 export type Contract = {
   key: string;
@@ -104,9 +111,49 @@ export function dte(exp: string, now: Date = new Date()): number {
 }
 
 export function tenorLabel(exp: string, now: Date = new Date()): string {
+  if (!exp) return "Shares";
   const d = dte(exp, now);
   if (d <= 0) return "0 DTE";
   return `${d} DTE`;
+}
+
+export function daysHeld(openedAt: string | null | undefined, now: Date = new Date()): number | null {
+  if (!openedAt) return null;
+  const t = Date.parse(openedAt);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((now.getTime() - t) / 86_400_000));
+}
+
+export function daysHeldLabel(openedAt: string | null | undefined, now: Date = new Date()): string | null {
+  const d = daysHeld(openedAt, now);
+  if (d == null) return null;
+  if (d === 0) return "opened today";
+  if (d === 1) return "1d held";
+  return `${d}d held`;
+}
+
+export function eventMarks(c: Pick<Contract, "exp" | "earningsDate" | "exDivDate">, now: Date = new Date()): string[] {
+  const marks: string[] = [];
+  const today = nyDate(now);
+  if (c.earningsDate) {
+    const days = Math.round(
+      (Date.parse(`${c.earningsDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
+    );
+    const beforeExpiry = !c.exp || c.earningsDate <= c.exp;
+    if (days >= 0 && days <= 45 && beforeExpiry) {
+      marks.push(days === 0 ? "EAN today" : `EAN ${days}d`);
+    }
+  }
+  if (c.exDivDate) {
+    const days = Math.round(
+      (Date.parse(`${c.exDivDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
+    );
+    const beforeExpiry = !c.exp || c.exDivDate <= c.exp;
+    if (days >= 0 && days <= 45 && beforeExpiry) {
+      marks.push(days === 0 ? "XD today" : `XD ${days}d`);
+    }
+  }
+  return marks;
 }
 
 export function classifyDesk(und: string, exp: string, now: Date = new Date()): DeskKind {
@@ -340,9 +387,15 @@ export const DEMO_BOOK: Contract[] = [
   c("META", "2026-10-16", 570, "P", "S", 1, 7.1, 0.95, "premium", 28, 0.16),
   c("ARM", "2026-10-16", 300, "C", "S", 1, 5.2, 18.2, "premium", 72, -0.61),
   c("ARM", "2026-10-16", 200, "P", "S", 1, 4.8, 1.4, "premium", 72, 0.21),
-  c("CRM", "2026-10-16", 290, "C", "S", 1, 4.0, 5.2, "premium", 33, -0.31),
-  c("CRM", "2026-10-16", 230, "P", "S", 1, 3.6, 2.5, "premium", 33, 0.28),
-  c("OKTA", "2026-10-16", 195, "C", "S", 1, 2.1, 1.68, "premium", 47, -0.24),
+  c("CRM", "2026-10-16", 290, "C", "S", 1, 4.0, 5.2, "premium", 33, -0.31, {
+    earningsDate: "2026-11-25",
+  }),
+  c("CRM", "2026-10-16", 230, "P", "S", 1, 3.6, 2.5, "premium", 33, 0.28, {
+    earningsDate: "2026-11-25",
+  }),
+  c("OKTA", "2026-10-16", 195, "C", "S", 1, 2.1, 1.68, "premium", 47, -0.24, {
+    earningsDate: "2026-12-02",
+  }),
   c("LOW", "2026-10-16", 190, "P", "S", 1, 3.4, 2.72, "premium", 22, 0.26),
   c("TSLA", "2027-01-15", 250, "C", "L", 1, 40.0, 48.0, "premium", 55, 0.62),
   c("TSLA", "2027-06-18", 200, "C", "L", 1, 55.0, 52.25, "premium", 55, 0.71),
