@@ -24,6 +24,7 @@ import {
 } from "./account";
 import { DEMO_TAPE, type TapeQuote } from "./tape";
 import { setTradeNotes, syncTrades, type DeskTrade } from "./trades";
+import { type LedgerEntry } from "./ledger";
 import {
   guardedStateStorage,
   openPersistWrites,
@@ -51,11 +52,12 @@ type State = {
   alertCooldownMin: number;
   lastFired: Record<string, number>;
   lastItm: Record<string, boolean>;
-  tab: "status" | "book" | "archive" | "morning";
+  tab: "status" | "book" | "archive" | "morning" | "books";
   accountSettings: AccountSettings;
   snapshot: AccountSnapshot | null;
   trades: DeskTrade[];
   tape: TapeQuote[];
+  receipts: LedgerEntry[];
   setFilter: (f: Filter) => void;
   setDesk: (d: DeskKind) => void;
   toggleBookKind: (k: BookKind) => void;
@@ -82,6 +84,9 @@ type State = {
   setAccountSettings: (next: Partial<AccountSettings>) => void;
   setSnapshot: (snapshot: AccountSnapshot | null) => void;
   setTradeNote: (id: string, notes: string) => void;
+  addReceipt: (row: LedgerEntry) => void;
+  updateReceipt: (id: string, patch: Partial<LedgerEntry>) => void;
+  removeReceipt: (id: string) => void;
 };
 
 function withDesk(c: Contract): Contract {
@@ -122,6 +127,7 @@ export const useBook = create<State>()(
       snapshot: DEMO_SNAPSHOT,
       trades: [],
       tape: DEMO_TAPE,
+      receipts: [],
       setFilter: (filter) => set({ filter }),
       setDesk: (desk) => set({ desk, selectedKey: null, filter: "all" }),
       toggleBookKind: (k) =>
@@ -229,6 +235,10 @@ export const useBook = create<State>()(
         set((s) => ({ accountSettings: { ...s.accountSettings, ...next } })),
       setSnapshot: (snapshot) => set({ snapshot }),
       setTradeNote: (id, notes) => set((s) => ({ trades: setTradeNotes(s.trades, id, notes) })),
+      addReceipt: (row) => set((s) => ({ receipts: [row, ...s.receipts] })),
+      updateReceipt: (id, patch) =>
+        set((s) => ({ receipts: s.receipts.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
+      removeReceipt: (id) => set((s) => ({ receipts: s.receipts.filter((r) => r.id !== id) })),
     }),
     {
       name: PERSIST_KEY,
@@ -257,6 +267,7 @@ export const useBook = create<State>()(
         snapshot: s.snapshot,
         trades: s.trades,
         tape: s.tape,
+        receipts: s.receipts.map((r) => ({ ...r, thumb: r.thumb && r.thumb.length > 80_000 ? null : r.thumb })),
       }),
       merge: (persisted, current) => {
         if (!persisted || typeof persisted !== "object") return current;
@@ -277,15 +288,20 @@ export const useBook = create<State>()(
         const rawTrades = Array.isArray(p.trades) ? p.trades : current.trades;
         const trades = rawTrades.length ? rawTrades : syncTrades([], book);
         const tab =
-          p.tab === "book" || p.tab === "archive" || p.tab === "status" || p.tab === "morning"
+          p.tab === "book" ||
+          p.tab === "archive" ||
+          p.tab === "status" ||
+          p.tab === "morning" ||
+          p.tab === "books"
             ? p.tab
             : current.tab;
         const tape = Array.isArray(p.tape) && p.tape.length ? p.tape : current.tape;
+        const receipts = Array.isArray(p.receipts) ? p.receipts : current.receipts;
         const bookKinds = {
           ...DEFAULT_BOOK_KINDS,
           ...(p.bookKinds && typeof p.bookKinds === "object" ? p.bookKinds : {}),
         };
-        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds, trades, tape };
+        return { ...current, ...p, book, defaultRungs, filter, alerts, alertCooldownMin, lastFired, lastItm, accountSettings, snapshot, tab, bookKinds, trades, tape, receipts };
       },
     },
   ),

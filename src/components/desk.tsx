@@ -28,6 +28,7 @@ import { ContractEditor, ContractRow, MobileCard, tone } from "@/components/cont
 import { StatusPanel } from "@/components/status-panel";
 import { ArchivePanel } from "@/components/archive-panel";
 import { MorningPanel } from "@/components/morning-panel";
+import { LedgerPanel } from "@/components/ledger-panel";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -253,6 +254,7 @@ export function Desk() {
             ["status", "Account"],
             ["book", "Book"],
             ["archive", "Archive"],
+            ["books", "Books"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -272,6 +274,7 @@ export function Desk() {
       {tab === "morning" ? <MorningPanel /> : null}
       {tab === "status" ? <div className="pt-4"><StatusPanel /></div> : null}
       {tab === "archive" ? <ArchivePanel /> : null}
+      {tab === "books" ? <LedgerPanel /> : null}
       {tab === "book" ? (
         <>
       <div className="flex flex-wrap gap-2 px-4 pt-3">
